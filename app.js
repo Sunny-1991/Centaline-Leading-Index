@@ -251,9 +251,33 @@ function syncChartViewport({ resizeChart = true } = {}) {
     layout.overlayScaleMin,
     layout.overlayScaleMax,
   );
-  chartStatsOverlayEl.style.left = `${Math.round(chartWidth * layout.overlayLeftRatio)}px`;
-  chartStatsOverlayEl.style.top = `${Math.round(chartHeight * layout.overlayTopRatio)}px`;
+  const preferredLeft = Math.round(chartWidth * layout.overlayLeftRatio);
+  const preferredTop = Math.round(chartHeight * layout.overlayTopRatio);
   chartStatsOverlayEl.style.transform = `scale(${overlayScale})`;
+
+  const rawOverlayWidth = Number(chartStatsOverlayEl.offsetWidth) || 0;
+  const rawOverlayHeight = Number(chartStatsOverlayEl.offsetHeight) || 0;
+  const scaledOverlayWidth = rawOverlayWidth * overlayScale;
+  const scaledOverlayHeight = rawOverlayHeight * overlayScale;
+
+  const maxLeft = Math.max(8, chartWidth - scaledOverlayWidth - 8);
+  const overlaySafeGap = chartWidth <= 520 ? 56 : chartWidth <= 760 ? 46 : 18;
+  const requestedMinLeft = CHART_GRID_LAYOUT.left + overlaySafeGap;
+  const minLeft = Math.min(requestedMinLeft, maxLeft);
+  const finalLeft =
+    scaledOverlayWidth > 0
+      ? Math.round(clampNumber(preferredLeft, minLeft, maxLeft))
+      : preferredLeft;
+
+  const minTop = 8;
+  const maxTop = Math.max(minTop, chartHeight - scaledOverlayHeight - 8);
+  const finalTop =
+    scaledOverlayHeight > 0
+      ? Math.round(clampNumber(preferredTop, minTop, maxTop))
+      : preferredTop;
+
+  chartStatsOverlayEl.style.left = `${finalLeft}px`;
+  chartStatsOverlayEl.style.top = `${finalTop}px`;
 
   if (resizeChart) {
     chart.resize();
@@ -655,6 +679,7 @@ function renderChartStatsOverlay(rows, startMonth, endMonth) {
   if (!uiState.showChartTable || !Array.isArray(rows) || rows.length === 0) {
     chartStatsOverlayEl.classList.remove("show");
     chartStatsOverlayEl.innerHTML = "";
+    syncChartViewport({ resizeChart: false });
     return;
   }
 
@@ -705,6 +730,7 @@ function renderChartStatsOverlay(rows, startMonth, endMonth) {
   <div class="chart-stats-note">*图表制作：公众号 - 一座独立屋</div>
   `;
   chartStatsOverlayEl.classList.add("show");
+  syncChartViewport({ resizeChart: false });
 }
 
 function renderSummaryTable(rows) {
@@ -1275,8 +1301,9 @@ function makeOption(
   );
   const endLabelFontSize = chartWidth <= 520 ? 14 : chartWidth <= 760 ? 16 : 18;
   const legendFontSize = chartWidth <= 520 ? 12.5 : chartWidth <= 760 ? 13.5 : 15;
-  const seriesLineWidth = chartWidth <= 520 ? 2.18 : chartWidth <= 760 ? 2.42 : 3.02;
-  const markLineWidth = chartWidth <= 520 ? 1.35 : chartWidth <= 760 ? 1.55 : 2;
+  const yAxisLabelFontSize = chartWidth <= 520 ? 12 : chartWidth <= 760 ? 13 : 14;
+  const seriesLineWidth = chartWidth <= 520 ? 1.88 : chartWidth <= 760 ? 2.1 : 3.02;
+  const markLineWidth = chartWidth <= 520 ? 1.15 : chartWidth <= 760 ? 1.32 : 2;
   const markSymbolSize = chartWidth <= 520 ? 8 : chartWidth <= 760 ? 9 : 10;
   const plotBounds = {
     left: CHART_GRID_LAYOUT.left,
@@ -1452,7 +1479,7 @@ function makeOption(
       splitLine: { show: false },
       axisLabel: {
         color: "#304451",
-        fontSize: 14,
+        fontSize: yAxisLabelFontSize,
         fontWeight: 600,
         fontFamily: CHART_FONT_FAMILY,
         formatter(value) {

@@ -652,7 +652,7 @@ thead th {
     left: 14px;
     top: 14px;
     max-width: calc(100% - 16px);
-    min-width: 280px;
+    min-width: 240px;
   }
 
   .chart-stats-overlay table {
@@ -725,6 +725,10 @@ thead th {
   .chart-stats-overlay td {
     font-size: 0.72rem;
     padding: 2px 3px;
+  }
+
+  .chart-stats-overlay {
+    min-width: 220px;
   }
 
   .chart-stats-overlay table {
