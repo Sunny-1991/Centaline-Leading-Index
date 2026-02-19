@@ -221,13 +221,23 @@ function resolveXAxisLabelLayout(months, chartWidth, visibleStartIndex, visibleE
 
   visibleIndexes.add(safeStart);
   visibleIndexes.add(safeEnd);
+  const visibleValues = new Set();
+  visibleIndexes.forEach((index) => {
+    const value = months[index];
+    if (typeof value === "string" && value) {
+      visibleValues.add(value);
+    }
+  });
 
   return {
     margin,
     rotate,
     fontSize,
-    isLabelVisible(index) {
-      return visibleIndexes.has(index);
+    isLabelVisible(value, index) {
+      if (Number.isInteger(index) && visibleIndexes.has(index)) {
+        return true;
+      }
+      return visibleValues.has(String(value || ""));
     },
   };
 }
@@ -1459,10 +1469,12 @@ function makeOption(
         rotate: xAxisLabelLayout.rotate,
         fontSize: xAxisLabelLayout.fontSize,
         fontWeight: 800,
-        hideOverlap: true,
+        hideOverlap: false,
+        showMinLabel: true,
+        showMaxLabel: true,
         fontFamily: CHART_FONT_FAMILY,
         formatter(value, index) {
-          return xAxisLabelLayout.isLabelVisible(index) ? value : "";
+          return xAxisLabelLayout.isLabelVisible(value, index) ? value : "";
         },
       },
     },
