@@ -978,14 +978,6 @@ function resolvePeakLabelLayouts(rendered, months, yMin, yMax, labelGapMonths) {
 
   const chartWidth = chart.getWidth();
   const chartHeight = chart.getHeight();
-  const xAxisLabelLayout = resolveXAxisLabelLayout(
-    months,
-    chartWidth,
-    visibleStartIndex,
-    visibleEndIndex,
-  );
-  const endLabelFontSize = chartWidth <= 520 ? 14 : chartWidth <= 760 ? 16 : 18;
-  const legendFontSize = chartWidth <= 520 ? 12.5 : chartWidth <= 760 ? 13.5 : 15;
   const plotBounds = {
     left: CHART_GRID_LAYOUT.left,
     right: Math.max(CHART_GRID_LAYOUT.left + 1, chartWidth - CHART_GRID_LAYOUT.right),
@@ -1267,6 +1259,14 @@ function makeOption(
   const peakLabelLayouts = resolvePeakLabelLayouts(rendered, months, yMin, yMax, labelGapMonths);
   const chartWidth = chart.getWidth();
   const chartHeight = chart.getHeight();
+  const xAxisLabelLayout = resolveXAxisLabelLayout(
+    months,
+    chartWidth,
+    visibleStartIndex,
+    visibleEndIndex,
+  );
+  const endLabelFontSize = chartWidth <= 520 ? 14 : chartWidth <= 760 ? 16 : 18;
+  const legendFontSize = chartWidth <= 520 ? 12.5 : chartWidth <= 760 ? 13.5 : 15;
   const plotBounds = {
     left: CHART_GRID_LAYOUT.left,
     right: Math.max(CHART_GRID_LAYOUT.left + 1, chartWidth - CHART_GRID_LAYOUT.right),
