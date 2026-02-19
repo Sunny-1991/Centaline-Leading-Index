@@ -652,11 +652,12 @@ thead th {
     left: 14px;
     top: 14px;
     max-width: calc(100% - 16px);
+    min-width: 280px;
   }
 
   .chart-stats-overlay table {
-    width: 112%;
-    margin-left: -6%;
+    width: 102%;
+    margin-left: 0;
   }
 
   .chart-stats-note {
@@ -727,8 +728,8 @@ thead th {
   }
 
   .chart-stats-overlay table {
-    width: 108%;
-    margin-left: -4%;
+    width: 100%;
+    margin-left: 0;
   }
 
   .chart-stats-title-main {

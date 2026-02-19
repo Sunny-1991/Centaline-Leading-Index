@@ -124,6 +124,8 @@ function resolveResponsiveChartLayout(chartWidth) {
       maxHeight: 680,
       overlayScaleMin: 0.4,
       overlayScaleMax: 0.8,
+      overlayLeftRatio: 0.21,
+      overlayTopRatio: 0.042,
     };
   }
   if (chartWidth <= 760) {
@@ -133,6 +135,8 @@ function resolveResponsiveChartLayout(chartWidth) {
       maxHeight: 760,
       overlayScaleMin: 0.46,
       overlayScaleMax: 0.9,
+      overlayLeftRatio: 0.18,
+      overlayTopRatio: 0.046,
     };
   }
   if (chartWidth <= 1120) {
@@ -142,6 +146,8 @@ function resolveResponsiveChartLayout(chartWidth) {
       maxHeight: 920,
       overlayScaleMin: 0.62,
       overlayScaleMax: 1.08,
+      overlayLeftRatio: 0.14,
+      overlayTopRatio: 0.05,
     };
   }
   return {
@@ -150,6 +156,8 @@ function resolveResponsiveChartLayout(chartWidth) {
     maxHeight: CHART_LAYOUT_MAX_HEIGHT,
     overlayScaleMin: OVERLAY_SCALE_MIN,
     overlayScaleMax: OVERLAY_SCALE_MAX,
+    overlayLeftRatio: OVERLAY_LEFT_RATIO,
+    overlayTopRatio: OVERLAY_TOP_RATIO,
   };
 }
 
@@ -243,8 +251,8 @@ function syncChartViewport({ resizeChart = true } = {}) {
     layout.overlayScaleMin,
     layout.overlayScaleMax,
   );
-  chartStatsOverlayEl.style.left = `${Math.round(chartWidth * OVERLAY_LEFT_RATIO)}px`;
-  chartStatsOverlayEl.style.top = `${Math.round(chartHeight * OVERLAY_TOP_RATIO)}px`;
+  chartStatsOverlayEl.style.left = `${Math.round(chartWidth * layout.overlayLeftRatio)}px`;
+  chartStatsOverlayEl.style.top = `${Math.round(chartHeight * layout.overlayTopRatio)}px`;
   chartStatsOverlayEl.style.transform = `scale(${overlayScale})`;
 
   if (resizeChart) {
@@ -1267,6 +1275,9 @@ function makeOption(
   );
   const endLabelFontSize = chartWidth <= 520 ? 14 : chartWidth <= 760 ? 16 : 18;
   const legendFontSize = chartWidth <= 520 ? 12.5 : chartWidth <= 760 ? 13.5 : 15;
+  const seriesLineWidth = chartWidth <= 520 ? 2.18 : chartWidth <= 760 ? 2.42 : 3.02;
+  const markLineWidth = chartWidth <= 520 ? 1.35 : chartWidth <= 760 ? 1.55 : 2;
+  const markSymbolSize = chartWidth <= 520 ? 8 : chartWidth <= 760 ? 9 : 10;
   const plotBounds = {
     left: CHART_GRID_LAYOUT.left,
     right: Math.max(CHART_GRID_LAYOUT.left + 1, chartWidth - CHART_GRID_LAYOUT.right),
@@ -1635,7 +1646,7 @@ function makeOption(
         showSymbol: false,
         connectNulls: false,
         lineStyle: {
-          width: 3.02,
+          width: seriesLineWidth,
           color: item.color,
         },
         itemStyle: {
@@ -1657,16 +1668,16 @@ function makeOption(
         markLine:
           markLineData.length > 0
             ? {
-                symbolSize: 10,
                 lineStyle: {
                   type: "dashed",
-                  width: 2,
+                  width: markLineWidth,
                   color: item.color,
                   opacity: 1,
                 },
                 label: { show: false },
                 data: markLineData,
                 silent: true,
+                symbolSize: markSymbolSize,
               }
             : undefined,
         markPoint:
