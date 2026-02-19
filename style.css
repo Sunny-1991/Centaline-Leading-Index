@@ -655,8 +655,8 @@ thead th {
   }
 
   .chart-stats-overlay table {
-    width: 124%;
-    margin-left: -12%;
+    width: 112%;
+    margin-left: -6%;
   }
 
   .chart-stats-note {
@@ -724,6 +724,11 @@ thead th {
   .chart-stats-overlay td {
     font-size: 0.72rem;
     padding: 2px 3px;
+  }
+
+  .chart-stats-overlay table {
+    width: 108%;
+    margin-left: -4%;
   }
 
   .chart-stats-title-main {

@@ -119,20 +119,20 @@ function resolveAxisMonthFromZoomValue(value, percent, axisData) {
 function resolveResponsiveChartLayout(chartWidth) {
   if (chartWidth <= 520) {
     return {
-      aspectRatio: 0.9,
-      minHeight: 320,
+      aspectRatio: 1.02,
+      minHeight: 360,
       maxHeight: 680,
-      overlayScaleMin: 0.5,
-      overlayScaleMax: 0.88,
+      overlayScaleMin: 0.4,
+      overlayScaleMax: 0.8,
     };
   }
   if (chartWidth <= 760) {
     return {
-      aspectRatio: 0.84,
-      minHeight: 360,
+      aspectRatio: 0.94,
+      minHeight: 390,
       maxHeight: 760,
-      overlayScaleMin: 0.54,
-      overlayScaleMax: 0.94,
+      overlayScaleMin: 0.46,
+      overlayScaleMax: 0.9,
     };
   }
   if (chartWidth <= 1120) {
@@ -150,6 +150,77 @@ function resolveResponsiveChartLayout(chartWidth) {
     maxHeight: CHART_LAYOUT_MAX_HEIGHT,
     overlayScaleMin: OVERLAY_SCALE_MIN,
     overlayScaleMax: OVERLAY_SCALE_MAX,
+  };
+}
+
+function resolveXAxisLabelLayout(months, chartWidth, visibleStartIndex, visibleEndIndex) {
+  const safeStart = clampNumber(
+    Number.isInteger(visibleStartIndex) ? visibleStartIndex : 0,
+    0,
+    Math.max(0, months.length - 1),
+  );
+  const safeEnd = clampNumber(
+    Number.isInteger(visibleEndIndex) ? visibleEndIndex : safeStart,
+    safeStart,
+    Math.max(0, months.length - 1),
+  );
+
+  let maxLabels = 18;
+  let preferredMonths = new Set(["01", "07"]);
+  let rotate = 42;
+  let fontSize = 11.5;
+  let margin = 14;
+
+  if (chartWidth <= 520) {
+    maxLabels = 6;
+    preferredMonths = new Set(["01"]);
+    rotate = 34;
+    fontSize = 9.8;
+    margin = 12;
+  } else if (chartWidth <= 760) {
+    maxLabels = 8;
+    preferredMonths = new Set(["01"]);
+    rotate = 38;
+    fontSize = 10.4;
+    margin = 13;
+  } else if (chartWidth <= 1120) {
+    maxLabels = 12;
+    preferredMonths = new Set(["01"]);
+  }
+
+  const candidateIndexes = [];
+  for (let index = safeStart; index <= safeEnd; index += 1) {
+    const month = String(months[index] || "").slice(5, 7);
+    if (preferredMonths.has(month)) {
+      candidateIndexes.push(index);
+    }
+  }
+
+  if (candidateIndexes.length === 0) {
+    candidateIndexes.push(safeStart);
+    if (safeEnd !== safeStart) {
+      candidateIndexes.push(safeEnd);
+    }
+  }
+
+  const stride = Math.max(1, Math.ceil(candidateIndexes.length / maxLabels));
+  const visibleIndexes = new Set();
+  candidateIndexes.forEach((index, order) => {
+    if (order % stride === 0) {
+      visibleIndexes.add(index);
+    }
+  });
+
+  visibleIndexes.add(safeStart);
+  visibleIndexes.add(safeEnd);
+
+  return {
+    margin,
+    rotate,
+    fontSize,
+    isLabelVisible(index) {
+      return visibleIndexes.has(index);
+    },
   };
 }
 
@@ -907,6 +978,14 @@ function resolvePeakLabelLayouts(rendered, months, yMin, yMax, labelGapMonths) {
 
   const chartWidth = chart.getWidth();
   const chartHeight = chart.getHeight();
+  const xAxisLabelLayout = resolveXAxisLabelLayout(
+    months,
+    chartWidth,
+    visibleStartIndex,
+    visibleEndIndex,
+  );
+  const endLabelFontSize = chartWidth <= 520 ? 14 : chartWidth <= 760 ? 16 : 18;
+  const legendFontSize = chartWidth <= 520 ? 12.5 : chartWidth <= 760 ? 13.5 : 15;
   const plotBounds = {
     left: CHART_GRID_LAYOUT.left,
     right: Math.max(CHART_GRID_LAYOUT.left + 1, chartWidth - CHART_GRID_LAYOUT.right),
@@ -1238,7 +1317,7 @@ function makeOption(
       bottom: 10,
       textStyle: {
         color: "#26333b",
-        fontSize: 15,
+        fontSize: legendFontSize,
         fontWeight: 700,
         fontFamily: CHART_FONT_FAMILY,
       },
@@ -1330,22 +1409,22 @@ function makeOption(
       type: "category",
       data: months,
       axisTick: {
-        show: true,
+        show: chartWidth > 760,
         interval: 0,
-        length: 5,
+        length: chartWidth <= 520 ? 4 : 5,
       },
       axisLine: { lineStyle: { color: "#8b8d90" } },
       axisLabel: {
         color: "#36454f",
         interval: 0,
-        margin: 14,
-        rotate: 42,
-        fontSize: 11.5,
+        margin: xAxisLabelLayout.margin,
+        rotate: xAxisLabelLayout.rotate,
+        fontSize: xAxisLabelLayout.fontSize,
         fontWeight: 800,
+        hideOverlap: true,
         fontFamily: CHART_FONT_FAMILY,
-        formatter(value) {
-          const month = String(value).slice(5, 7);
-          return month === "01" || month === "07" ? value : "";
+        formatter(value, index) {
+          return xAxisLabelLayout.isLabelVisible(index) ? value : "";
         },
       },
     },
@@ -1568,7 +1647,7 @@ function makeOption(
           color: item.color,
           fontWeight: 700,
           fontFamily: CHART_FONT_FAMILY,
-          fontSize: 18,
+          fontSize: endLabelFontSize,
           backgroundColor: CHART_TEXT_MASK_COLOR,
           padding: [1, 5],
         },
