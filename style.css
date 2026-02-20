@@ -385,6 +385,11 @@ select:focus {
   border-bottom: 1px solid #6f747a;
 }
 
+.chart-stats-overlay.is-cross-source table {
+  width: 127.5%;
+  margin-left: -6.2%;
+}
+
 .chart-stats-overlay th,
 .chart-stats-overlay td {
   font-family: var(--chart-font);
@@ -400,6 +405,16 @@ select:focus {
 .chart-stats-overlay th:first-child,
 .chart-stats-overlay td:first-child {
   text-align: center;
+}
+
+.chart-stats-overlay.is-cross-source th:first-child,
+.chart-stats-overlay.is-cross-source td:first-child {
+  padding-right: 10px;
+}
+
+.chart-stats-city-main {
+  position: relative;
+  display: inline-block;
 }
 
 .chart-stats-overlay th {
@@ -423,6 +438,12 @@ select:focus {
   text-align: center;
 }
 
+.chart-stats-overlay.is-cross-source .chart-stats-title-main,
+.chart-stats-overlay.is-cross-source .chart-stats-title-sub {
+  width: 127.5%;
+  margin-left: -6.2%;
+}
+
 .chart-stats-title-sub {
   font-family: var(--chart-font);
   font-size: 0.8rem;
@@ -433,7 +454,7 @@ select:focus {
 }
 
 .chart-stats-title-sub:last-of-type {
-  margin-bottom: 12px;
+  margin-bottom: 15px;
 }
 
 .chart-stats-note {
@@ -443,6 +464,17 @@ select:focus {
   color: #22282d;
   margin-top: 1px;
   margin-left: -1.5em;
+}
+
+.chart-stats-source-tag {
+  position: absolute;
+  left: calc(100% + 2px);
+  top: 50%;
+  transform: translateY(-48%);
+  font-size: 0.82em;
+  font-weight: 500;
+  color: #4a5661;
+  white-space: nowrap;
 }
 
 .table-wrap {
@@ -660,6 +692,17 @@ thead th {
     margin-left: 0;
   }
 
+  .chart-stats-overlay.is-cross-source table {
+    width: 108%;
+    margin-left: -3%;
+  }
+
+  .chart-stats-overlay.is-cross-source .chart-stats-title-main,
+  .chart-stats-overlay.is-cross-source .chart-stats-title-sub {
+    width: 108%;
+    margin-left: -3%;
+  }
+
   .chart-stats-note {
     margin-left: -1.1em;
   }
@@ -734,6 +777,17 @@ thead th {
   .chart-stats-overlay table {
     width: 100%;
     margin-left: 0;
+  }
+
+  .chart-stats-overlay.is-cross-source table {
+    width: 104%;
+    margin-left: -2%;
+  }
+
+  .chart-stats-overlay.is-cross-source .chart-stats-title-main,
+  .chart-stats-overlay.is-cross-source .chart-stats-title-sub {
+    width: 104%;
+    margin-left: -2%;
   }
 
   .chart-stats-title-main {

@@ -46,15 +46,32 @@ const chart = echarts.init(chartEl, null, {
   renderer: "canvas",
 });
 
-const fallbackPalette = ["#5b9bd5", "#e2843f", "#5d8f47", "#e6b311", "#7d8b99", "#1d1d1d"];
-const namedColorMap = {
+const LEGACY_CORE_CITY_COLORS = Object.freeze({
   北京: "#5b9bd5",
   上海: "#e2843f",
   深圳: "#5d8f47",
   广州: "#e6b311",
   香港: "#1d1d1d",
   天津: "#7d8b99",
-};
+});
+const OTHER_CITY_DISTINCT_PALETTE = [
+  "#7f3fbf",
+  "#d62839",
+  "#007f8a",
+  "#9b1d20",
+  "#4361ee",
+  "#c2185b",
+  "#00897b",
+  "#5e35b1",
+  "#ad1457",
+  "#00695c",
+  "#6d4c41",
+  "#3949ab",
+  "#ef476f",
+  "#118ab2",
+];
+const dynamicCityColorMap = new Map();
+let dynamicColorCursor = 0;
 const OVERLAY_CITY_ORDER = ["北京", "上海", "广州", "深圳", "天津", "香港"];
 const OVERLAY_CITY_ORDER_INDEX = new Map(
   OVERLAY_CITY_ORDER.map((name, index) => [name, index]),
@@ -78,6 +95,16 @@ const CHART_GRID_LAYOUT = Object.freeze({
 });
 const MAX_SELECTED_CITY_COUNT = 6;
 const COMPARE_CITY_WHITELIST = new Set(["北京", "上海", "广州", "深圳", "天津"]);
+const OVERLAY_SOURCE_PROFILES = Object.freeze({
+  centaline6: {
+    tableTitle: "中原领先指数",
+    sourceNote: "Wind、中原",
+  },
+  nbs70: {
+    tableTitle: "统计局指数",
+    sourceNote: "国家统计局",
+  },
+});
 const cityById = new Map();
 const cityValidRanges = new Map();
 const uiState = {
@@ -162,6 +189,11 @@ function buildCityMaps() {
 function applyDataSource(sourceKey) {
   const source = findSourceByKey(sourceKey);
   if (!source) return false;
+  const previousSelectedCityNames = raw
+    ? readSelectedCityIds()
+      .map((cityId) => cityById.get(cityId)?.name)
+      .filter(Boolean)
+    : null;
 
   raw = source.data;
   activeSourceMeta = source;
@@ -179,7 +211,11 @@ function applyDataSource(sourceKey) {
   uiState.showChartTable = true;
 
   buildCityMaps();
-  buildCityControls(raw.cities, source.defaultSelectedNames);
+  const currentCityNameSet = new Set(raw.cities.map((city) => city.name));
+  const nextSelectedNames = Array.isArray(previousSelectedCityNames)
+    ? previousSelectedCityNames.filter((name) => currentCityNameSet.has(name))
+    : source.defaultSelectedNames;
+  buildCityControls(raw.cities, nextSelectedNames);
   buildMonthSelects(raw.dates);
   refreshCompareSourceControl({ keepSelection: false });
   return true;
@@ -572,7 +608,7 @@ function getSelectedEffectiveRange(selectedCityIds) {
 function buildCityControls(cities, defaultSelectedNames = null) {
   cityListEl.innerHTML = "";
   const preferredNameSet =
-    Array.isArray(defaultSelectedNames) && defaultSelectedNames.length > 0
+    Array.isArray(defaultSelectedNames)
       ? new Set(defaultSelectedNames)
       : null;
   const orderedCities = [...cities].sort((a, b) => {
@@ -620,15 +656,24 @@ function colorFromCityName(cityName = "", index = 0) {
   for (let i = 0; i < text.length; i += 1) {
     hash = (hash * 131 + text.charCodeAt(i)) >>> 0;
   }
-  const seed = (hash + index * 47) % 360;
-  const hue = (seed * 11) % 360;
-  return `hsl(${hue}, 56%, 42%)`;
+  const seed = (hash + index * 67) % 360;
+  const hue = (seed * 19) % 360;
+  return `hsl(${hue}, 72%, 40%)`;
 }
 
 function getColor(cityName, index) {
-  if (namedColorMap[cityName]) return namedColorMap[cityName];
-  if (index < fallbackPalette.length) return fallbackPalette[index];
-  return colorFromCityName(cityName, index);
+  if (LEGACY_CORE_CITY_COLORS[cityName]) return LEGACY_CORE_CITY_COLORS[cityName];
+  if (dynamicCityColorMap.has(cityName)) return dynamicCityColorMap.get(cityName);
+
+  let nextColor = "";
+  if (dynamicColorCursor < OTHER_CITY_DISTINCT_PALETTE.length) {
+    nextColor = OTHER_CITY_DISTINCT_PALETTE[dynamicColorCursor];
+    dynamicColorCursor += 1;
+  } else {
+    nextColor = colorFromCityName(cityName, index + dynamicColorCursor);
+  }
+  dynamicCityColorMap.set(cityName, nextColor);
+  return nextColor;
 }
 
 function getLastFiniteInfo(values, dates) {
@@ -685,49 +730,63 @@ function calcPctChange(currentValue, baseValue) {
   return ((currentValue / baseValue) - 1) * 100;
 }
 
-function findRecoverIndex(values, latestValue, peakIndex) {
+function findRecoverIndex(values, latestValue, historyEndIndex) {
   if (!Array.isArray(values) || !isFiniteNumber(latestValue)) return -1;
-  if (!Number.isInteger(peakIndex) || peakIndex < 0) return -1;
+  if (!Number.isInteger(historyEndIndex) || historyEndIndex < 0) return -1;
 
-  const safePeakIndex = Math.min(peakIndex, values.length - 1);
-  const toleranceRatio = 0.03;
-  let recoverIndex = -1;
+  const safeEndIndex = Math.min(historyEndIndex, values.length - 1);
+  const latestRounded = Number(latestValue.toFixed(1));
+  const exactTolerance = Math.max(Math.abs(latestValue) * 0.0006, 0.03);
 
-  for (let i = 0; i <= safePeakIndex; i += 1) {
+  for (let i = 0; i <= safeEndIndex; i += 1) {
     const value = values[i];
     if (!isFiniteNumber(value)) continue;
-    const ratioDiff = Math.abs(value - latestValue) / Math.max(Math.abs(latestValue), 1);
-    if (ratioDiff <= toleranceRatio) {
-      recoverIndex = i;
-      break;
+    if (Number(value.toFixed(1)) === latestRounded) {
+      return i;
     }
   }
 
-  if (recoverIndex < 0) {
-    for (let i = 0; i <= safePeakIndex; i += 1) {
-      const value = values[i];
-      if (!isFiniteNumber(value)) continue;
-      if (value >= latestValue) {
-        recoverIndex = i;
-        break;
-      }
+  for (let i = 0; i <= safeEndIndex; i += 1) {
+    const value = values[i];
+    if (!isFiniteNumber(value)) continue;
+    if (Math.abs(value - latestValue) <= exactTolerance) {
+      return i;
     }
   }
 
-  if (recoverIndex < 0) {
-    let bestDiff = Number.POSITIVE_INFINITY;
-    for (let i = 0; i <= safePeakIndex; i += 1) {
-      const value = values[i];
-      if (!isFiniteNumber(value)) continue;
-      const diff = Math.abs(value - latestValue);
-      if (diff < bestDiff) {
-        bestDiff = diff;
-        recoverIndex = i;
-      }
+  for (let i = 1; i <= safeEndIndex; i += 1) {
+    const prevValue = values[i - 1];
+    const currValue = values[i];
+    if (!isFiniteNumber(prevValue) || !isFiniteNumber(currValue)) continue;
+    const prevDelta = prevValue - latestValue;
+    const currDelta = currValue - latestValue;
+    if (!Number.isFinite(prevDelta) || !Number.isFinite(currDelta)) continue;
+    if (Math.abs(prevDelta) <= exactTolerance) return i - 1;
+    if (Math.abs(currDelta) <= exactTolerance) return i;
+    if (prevDelta === 0 || currDelta === 0) continue;
+    if (prevDelta * currDelta < 0) {
+      return i - 1;
     }
   }
 
-  return recoverIndex;
+  let nearestIndex = -1;
+  let nearestDiff = Number.POSITIVE_INFINITY;
+  for (let i = 0; i <= safeEndIndex; i += 1) {
+    const value = values[i];
+    if (!isFiniteNumber(value)) continue;
+    const diff = Math.abs(value - latestValue);
+    if (diff < nearestDiff) {
+      nearestDiff = diff;
+      nearestIndex = i;
+    }
+  }
+  return nearestIndex;
+}
+
+function getOverlayColumnRatios(isCrossSource) {
+  return isCrossSource
+    ? [0.31, 0.175, 0.17, 0.17, 0.175]
+    : [0.25, 0.19, 0.19, 0.19, 0.18];
 }
 
 function decorateDrawdownForViewport(
@@ -743,7 +802,11 @@ function decorateDrawdownForViewport(
   const peakGlobalIndex = toGlobalIndex(drawdown.peakIndex);
   const latestGlobalIndex = toGlobalIndex(drawdown.latestIndex);
 
-  let recoverGlobalIndex = findRecoverIndex(normalizedAll, drawdown.latestValue, peakGlobalIndex);
+  let recoverGlobalIndex = findRecoverIndex(
+    normalizedAll,
+    drawdown.latestValue,
+    Math.max(0, latestGlobalIndex - 1),
+  );
   if (!Number.isInteger(recoverGlobalIndex) || recoverGlobalIndex < 0) {
     recoverGlobalIndex = toGlobalIndex(drawdown.recoverIndex);
   }
@@ -860,7 +923,7 @@ function findDrawdownAnalysis(values, months) {
   const drawdownPct = calcPctChange(latestValue, peakValue);
   if (!isFiniteNumber(drawdownPct) || drawdownPct > -10) return null;
 
-  const recoverIndex = findRecoverIndex(values, latestValue, peakIndex);
+  const recoverIndex = findRecoverIndex(values, latestValue, Math.max(0, latestIndex - 1));
   if (recoverIndex < 0) return null;
 
   const midIndex = Math.floor((recoverIndex + latestIndex) / 2);
@@ -917,24 +980,68 @@ function updateChartTableButton(eligibleCount) {
     : "表格汇总（关闭）";
 }
 
+function getOverlaySourceProfile(sourceKey) {
+  if (typeof sourceKey === "string" && sourceKey.includes("nbs")) {
+    return OVERLAY_SOURCE_PROFILES.nbs70;
+  }
+  return OVERLAY_SOURCE_PROFILES.centaline6;
+}
+
+function resolveOverlayPresentation(rows) {
+  const sourceKeys = [
+    ...new Set((rows || []).map((row) => String(row.sourceKey || "centaline6"))),
+  ];
+  const isCrossSource = sourceKeys.length > 1;
+  const singleSourceKey = sourceKeys[0] || "centaline6";
+  const headerLabel = isCrossSource
+    ? "房价数据源"
+    : singleSourceKey.includes("nbs")
+      ? "统计局指数"
+      : "中原领先指数";
+  const sourceNoteText = isCrossSource
+    ? [...new Set(sourceKeys.map((sourceKey) => getOverlaySourceProfile(sourceKey).sourceNote))].join("、")
+    : getOverlaySourceProfile(singleSourceKey).sourceNote;
+  return {
+    isCrossSource,
+    headerLabel,
+    sourceNoteText,
+  };
+}
+
+function formatOverlayCityCellHtml(row, isCrossSource) {
+  const cityName = row.cityName || row.name || "-";
+  if (!isCrossSource || !row.sourceLabel) return cityName;
+  return `<span class="chart-stats-city-main">${cityName}<span class="chart-stats-source-tag">（${row.sourceLabel}）</span></span>`;
+}
+
 function renderChartStatsOverlay(rows, startMonth, endMonth) {
   if (!uiState.showChartTable || !Array.isArray(rows) || rows.length === 0) {
     chartStatsOverlayEl.classList.remove("show");
+    chartStatsOverlayEl.classList.remove("is-cross-source");
     chartStatsOverlayEl.innerHTML = "";
     syncChartViewport({ resizeChart: false });
     return;
   }
 
+  const { isCrossSource, headerLabel, sourceNoteText } = resolveOverlayPresentation(rows);
+
   const orderedRows = [...rows].sort((a, b) => {
-    const aRank = OVERLAY_CITY_ORDER_INDEX.has(a.name)
-      ? OVERLAY_CITY_ORDER_INDEX.get(a.name)
+    const aCityName = String(a.cityName || a.name || "");
+    const bCityName = String(b.cityName || b.name || "");
+    const aRank = OVERLAY_CITY_ORDER_INDEX.has(aCityName)
+      ? OVERLAY_CITY_ORDER_INDEX.get(aCityName)
       : Number.MAX_SAFE_INTEGER;
-    const bRank = OVERLAY_CITY_ORDER_INDEX.has(b.name)
-      ? OVERLAY_CITY_ORDER_INDEX.get(b.name)
+    const bRank = OVERLAY_CITY_ORDER_INDEX.has(bCityName)
+      ? OVERLAY_CITY_ORDER_INDEX.get(bCityName)
       : Number.MAX_SAFE_INTEGER;
     if (aRank !== bRank) return aRank - bRank;
-    return String(a.name).localeCompare(String(b.name), "zh-CN");
+    return aCityName.localeCompare(bCityName, "zh-CN");
   });
+
+  const colRatios = getOverlayColumnRatios(isCrossSource);
+  const colGroupHtml = `<colgroup>${colRatios
+    .map((ratio) => `<col style="width:${(ratio * 100).toFixed(2)}%">`)
+    .join("")}</colgroup>`;
 
   const bodyRows = orderedRows
     .map((row) => {
@@ -943,7 +1050,7 @@ function renderChartStatsOverlay(rows, startMonth, endMonth) {
         ? `${Math.abs(row.drawdownFromPeakPct).toFixed(1)}%`
         : "-";
       return `<tr>
-        <td>${row.name}</td>
+        <td>${formatOverlayCityCellHtml(row, isCrossSource)}</td>
         <td>${formatNumber(row.peakValue, 1)}</td>
         <td>${formatNumber(row.latestValue, 1)}</td>
         <td>${drawdownText}</td>
@@ -957,9 +1064,10 @@ function renderChartStatsOverlay(rows, startMonth, endMonth) {
     <div class="chart-stats-title-sub">${formatMonthZh(startMonth)} - ${formatMonthZh(endMonth)}</div>
     <div class="chart-stats-title-sub">定基${formatMonthZh(startMonth)} = 100</div>
     <table>
+    ${colGroupHtml}
     <thead>
       <tr>
-        <th>中原领先指数</th>
+        <th>${headerLabel}</th>
         <th>最高位置</th>
         <th>当前位置</th>
         <th>累计跌幅</th>
@@ -968,10 +1076,11 @@ function renderChartStatsOverlay(rows, startMonth, endMonth) {
     </thead>
     <tbody>${bodyRows}</tbody>
   </table>
-  <div class="chart-stats-note">*数据来源：Wind、中原</div>
+  <div class="chart-stats-note">*数据来源：${sourceNoteText}</div>
   <div class="chart-stats-note">*图表制作：公众号 - 一座独立屋</div>
   `;
   chartStatsOverlayEl.classList.add("show");
+  chartStatsOverlayEl.classList.toggle("is-cross-source", isCrossSource);
   syncChartViewport({ resizeChart: false });
 }
 
@@ -1009,15 +1118,19 @@ function drawOverlaySummaryOnCanvas(ctx, canvasWidth, canvasHeight, exportContex
     : [];
   if (rows.length === 0) return;
 
+  const { isCrossSource, headerLabel, sourceNoteText } = resolveOverlayPresentation(rows);
+
   const orderedRows = [...rows].sort((a, b) => {
-    const aRank = OVERLAY_CITY_ORDER_INDEX.has(a.name)
-      ? OVERLAY_CITY_ORDER_INDEX.get(a.name)
+    const aCityName = String(a.cityName || a.name || "");
+    const bCityName = String(b.cityName || b.name || "");
+    const aRank = OVERLAY_CITY_ORDER_INDEX.has(aCityName)
+      ? OVERLAY_CITY_ORDER_INDEX.get(aCityName)
       : Number.MAX_SAFE_INTEGER;
-    const bRank = OVERLAY_CITY_ORDER_INDEX.has(b.name)
-      ? OVERLAY_CITY_ORDER_INDEX.get(b.name)
+    const bRank = OVERLAY_CITY_ORDER_INDEX.has(bCityName)
+      ? OVERLAY_CITY_ORDER_INDEX.get(bCityName)
       : Number.MAX_SAFE_INTEGER;
     if (aRank !== bRank) return aRank - bRank;
-    return String(a.name).localeCompare(String(b.name), "zh-CN");
+    return aCityName.localeCompare(bCityName, "zh-CN");
   });
 
   const chartRect = chartEl.getBoundingClientRect();
@@ -1029,9 +1142,13 @@ function drawOverlaySummaryOnCanvas(ctx, canvasWidth, canvasHeight, exportContex
   const boxX = (overlayRect.left - chartRect.left) * scaleX;
   const boxY = (overlayRect.top - chartRect.top) * scaleY;
   const boxW = overlayRect.width * scaleX;
-  const tableW = boxW * 1.2075;
-  const tableX = boxX - (tableW - boxW) / 2;
-  const centerX = boxX + boxW / 2;
+  const tableScale = isCrossSource ? 1.275 : 1.2075;
+  const tableW = boxW * tableScale;
+  const tableDelta = tableW - boxW;
+  const tableX = isCrossSource
+    ? boxX - tableDelta * 0.35
+    : boxX - tableDelta / 2;
+  const centerX = tableX + tableW / 2;
   const fontFamily = '"STKaiti","Kaiti SC","KaiTi","BiauKai",serif';
 
   const mainFontSize = Math.max(16, Math.round(18 * scaleY));
@@ -1058,10 +1175,10 @@ function drawOverlaySummaryOnCanvas(ctx, canvasWidth, canvasHeight, exportContex
   );
   cursorY += Math.round(subFontSize * 1.24);
   ctx.fillText(`定基${formatMonthZh(exportContext.startMonth)} = 100`, centerX, cursorY);
-  cursorY += Math.round(subFontSize * 1.72);
+  cursorY += Math.round(subFontSize * 1.9);
 
-  const header = ["中原领先指数", "最高位置", "当前位置", "累计跌幅", "跌回"];
-  const colRatios = [0.25, 0.19, 0.19, 0.19, 0.18];
+  const header = [headerLabel, "最高位置", "当前位置", "累计跌幅", "跌回"];
+  const colRatios = getOverlayColumnRatios(isCrossSource);
   const colWidths = colRatios.map((ratio) => ratio * tableW);
   const rowHeight = Math.max(18, Math.round(cellFontSize * 1.35));
   const headerHeight = Math.max(19, Math.round(cellFontSize * 1.42));
@@ -1097,22 +1214,41 @@ function drawOverlaySummaryOnCanvas(ctx, canvasWidth, canvasHeight, exportContex
     const drawdownText = isFiniteNumber(row.drawdownFromPeakPct)
       ? `${Math.abs(row.drawdownFromPeakPct).toFixed(1)}%`
       : "-";
-    const cells = [
-      row.name,
-      formatNumber(row.peakValue, 1),
-      formatNumber(row.latestValue, 1),
-      drawdownText,
-      recoverText,
-    ];
+    const cityName = row.cityName || row.name || "-";
+    const sourceLabel = isCrossSource ? String(row.sourceLabel || "") : "";
+    const cells = [cityName, formatNumber(row.peakValue, 1), formatNumber(row.latestValue, 1), drawdownText, recoverText];
 
     let colStartX = tableX;
     for (let i = 0; i < cells.length; i += 1) {
       const midX = colStartX + colWidths[i] / 2;
-      ctx.fillText(
-        String(cells[i]),
-        midX,
-        rowTop + Math.round((rowHeight - cellFontSize) / 2) - 1,
-      );
+      const rowTextY = rowTop + Math.round((rowHeight - cellFontSize) / 2) - 1;
+      if (i === 0 && sourceLabel) {
+        const mainText = cityName;
+        const subText = `（${sourceLabel}）`;
+        const mainFont = `400 ${cellFontSize}px ${fontFamily}`;
+        const subFontSize = Math.max(10, Math.round(cellFontSize * 0.82));
+        const subFont = `400 ${subFontSize}px ${fontFamily}`;
+
+        ctx.textAlign = "center";
+        ctx.font = mainFont;
+        const mainWidth = ctx.measureText(mainText).width;
+        ctx.fillStyle = "#1f252a";
+        ctx.fillText(mainText, midX, rowTextY);
+
+        ctx.textAlign = "left";
+        ctx.font = subFont;
+        ctx.fillStyle = "#4a5661";
+        ctx.fillText(
+          subText,
+          midX + mainWidth / 2 + 2,
+          rowTextY + Math.max(0, Math.round((cellFontSize - subFontSize) * 0.45)),
+        );
+        ctx.fillStyle = "#1f252a";
+        ctx.textAlign = "center";
+        ctx.font = mainFont;
+      } else {
+        ctx.fillText(String(cells[i]), midX, rowTextY);
+      }
       colStartX += colWidths[i];
     }
 
@@ -1128,7 +1264,7 @@ function drawOverlaySummaryOnCanvas(ctx, canvasWidth, canvasHeight, exportContex
   ctx.font = `400 ${noteFontSize}px ${fontFamily}`;
   ctx.textAlign = "left";
   const noteLeftX = tableX - noteFontSize * 1.5;
-  ctx.fillText("*数据来源：Wind、中原", noteLeftX, cursorY);
+  ctx.fillText(`*数据来源：${sourceNoteText}`, noteLeftX, cursorY);
   ctx.fillText(
     "*图表制作：公众号 - 一座独立屋",
     noteLeftX,
@@ -1464,7 +1600,10 @@ function resolveDrawdownValueLabelOffset(anchorX, anchorY, peakLabelRects, chart
 
   const labelLines = ["累计跌幅", "00.0%"];
   const labelBox = estimateLabelBox(labelLines, 14, [2, 4], 700);
-  const offsetCandidates = [0, 12, -12, 18, -18, 26, -26, 34, -34, 44, -44];
+  const maxOffsetPx = 12;
+  const offsetCandidates = [0, 6, -6, 10, -10, 12, -12].filter(
+    (offsetY) => Math.abs(offsetY) <= maxOffsetPx,
+  );
 
   let best = null;
   for (const offsetY of offsetCandidates) {
@@ -1482,7 +1621,7 @@ function resolveDrawdownValueLabelOffset(anchorX, anchorY, peakLabelRects, chart
       0,
     );
     const overflow = calcRectOverflow(rect, chartBounds);
-    const score = overlapCount * 10000 + overflow * 100 + Math.abs(offsetY);
+    const score = overlapCount * 10000 + overflow * 180 + Math.abs(offsetY) * 8;
     if (!best || score < best.score) {
       best = { score, offsetY, overlapCount, overflow };
     }
@@ -1908,6 +2047,12 @@ function makeOption(
         }
       }
 
+      const endLabelMainText = item.endLabelMain || item.name;
+      const endLabelSubText = item.endLabelSub || "";
+      const endLabelBoxWidth = endLabelSubText
+        ? Math.max(86, Math.round(endLabelFontSize * 5.4))
+        : null;
+
       return {
         name: item.name,
         type: "line",
@@ -1927,24 +2072,28 @@ function makeOption(
         },
         endLabel: {
           show: true,
+          position: "right",
+          distance: endLabelSubText ? 5 : 12,
+          offset: endLabelSubText ? [-24, 0] : [-6, 0],
           formatter() {
-            const mainText = item.endLabelMain || item.name;
-            const subText = item.endLabelSub || "";
-            if (subText) {
-              return `{main|${mainText}}\n{sub|${subText}}`;
+            if (endLabelSubText) {
+              return `{main|${endLabelMainText}}\n{sub|${endLabelSubText}}`;
             }
-            return `{main|${mainText}}`;
+            return `{main|${endLabelMainText}}`;
           },
+          align: "left",
           color: item.color,
           fontFamily: CHART_FONT_FAMILY,
           fontSize: endLabelFontSize,
-          backgroundColor: CHART_TEXT_MASK_COLOR,
+          backgroundColor: endLabelSubText ? "rgba(0,0,0,0)" : CHART_TEXT_MASK_COLOR,
           padding: item.endLabelSub ? [2, 5] : [1, 5],
           rich: {
             main: {
               color: item.color,
               fontFamily: CHART_FONT_FAMILY,
               fontWeight: 700,
+              width: endLabelBoxWidth || undefined,
+              align: endLabelSubText ? "center" : "left",
               fontSize: Math.max(10, Math.round(endLabelFontSize * (item.endLabelMainScale || 1))),
               lineHeight: Math.max(
                 13,
@@ -1955,6 +2104,8 @@ function makeOption(
               color: item.color,
               fontFamily: CHART_FONT_FAMILY,
               fontWeight: 600,
+              width: endLabelBoxWidth || undefined,
+              align: endLabelSubText ? "center" : "left",
               fontSize: Math.max(8, Math.round(endLabelFontSize * (item.endLabelSubScale || 0.82))),
               lineHeight: Math.max(
                 10,
@@ -2123,6 +2274,8 @@ function render() {
   function appendSeries({
     city,
     seriesRaw,
+    sourceKey = activeSourceMeta?.key || "centaline6",
+    sourceLabel = activeSourceMeta?.legendLabel || "中原",
     displayName,
     endLabelMain = displayName,
     endLabelSub = "",
@@ -2204,6 +2357,9 @@ function render() {
 
     summaryRows.push({
       name: displayName,
+      cityName: city.name,
+      sourceKey,
+      sourceLabel,
       baseRaw,
       peakValue,
       peakDate: peakMonth,
@@ -2230,6 +2386,8 @@ function render() {
     appendSeries({
       city,
       seriesRaw: series.slice(startIndex, endIndex + 1),
+      sourceKey: activeSourceMeta?.key || "centaline6",
+      sourceLabel: activeSourceLegend,
       displayName,
       endLabelMain:
         compareContext && selectedCityIds.length === 1 && city.name === compareContext.cityName
@@ -2261,6 +2419,8 @@ function render() {
       compareSeriesRendered = appendSeries({
         city: compareContext.city,
         seriesRaw: alignSeriesByMonths(compareContext.source.data, compareSeries, months),
+        sourceKey: compareContext.source.key,
+        sourceLabel: compareSourceLegend,
         displayName: `${compareContext.cityName}（${compareSourceLegend}）`,
         endLabelMain: compareContext.cityName,
         endLabelSub: `（${compareSourceLegend}）`,
@@ -2270,7 +2430,7 @@ function render() {
         lineType: "dashed",
         lineWidthScale: 0.94,
         lineOpacity: 0.96,
-        allowAnnotations: false,
+        allowAnnotations: true,
       });
     }
   }
