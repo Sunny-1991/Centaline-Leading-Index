@@ -395,20 +395,20 @@ function resolveXAxisLabelLayout(months, chartWidth, visibleStartIndex, visibleE
   let maxLabels = 18;
   let preferredMonths = new Set(["01", "07"]);
   let rotate = 42;
-  let fontSize = 11.5;
+  let fontSize = 12.0;
   let margin = 14;
 
   if (chartWidth <= 520) {
     maxLabels = 6;
     preferredMonths = new Set(["01"]);
     rotate = 34;
-    fontSize = 9.8;
+    fontSize = 10.3;
     margin = 12;
   } else if (chartWidth <= 760) {
     maxLabels = 8;
     preferredMonths = new Set(["01"]);
     rotate = 38;
-    fontSize = 10.4;
+    fontSize = 10.9;
     margin = 13;
   } else if (chartWidth <= 1120) {
     maxLabels = 12;
