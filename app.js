@@ -934,6 +934,7 @@ function resolveRecoverLabelLayoutAvoidPeak(
   peakLabelRects,
   chartBounds,
   recoverLabelBox,
+  avoidRects = [],
 ) {
   if (
     !horizontalLayout ||
@@ -973,13 +974,18 @@ function resolveRecoverLabelLayoutAvoidPeak(
     if (rightJump <= endIndex) candidateIndices.unshift(rightJump);
   }
 
-  function countPeakConflicts(recoverRect) {
-    if (!recoverRect) return 0;
-    let count = 0;
+  function countConflicts(recoverRect) {
+    if (!recoverRect) {
+      return {
+        peakCount: 0,
+        labelCount: 0,
+      };
+    }
+    let peakCount = 0;
     for (const peakRect of peakLabelRects) {
       if (!peakRect) continue;
       if (rectsOverlap(recoverRect, peakRect, 10)) {
-        count += 1;
+        peakCount += 1;
         continue;
       }
 
@@ -997,10 +1003,24 @@ function resolveRecoverLabelLayoutAvoidPeak(
       const nearX = dx <= Math.max(recoverRect.width, peakRect.width) * 0.5;
       const nearY = verticalGap <= 14;
       if (nearX && nearY) {
-        count += 1;
+        peakCount += 1;
       }
     }
-    return count;
+
+    let labelCount = 0;
+    if (Array.isArray(avoidRects)) {
+      for (const occupiedRect of avoidRects) {
+        if (!occupiedRect) continue;
+        if (rectsOverlap(recoverRect, occupiedRect, 5)) {
+          labelCount += 1;
+        }
+      }
+    }
+
+    return {
+      peakCount,
+      labelCount,
+    };
   }
 
   let bestCandidate = null;
@@ -1019,21 +1039,26 @@ function resolveRecoverLabelLayoutAvoidPeak(
       offsetX: 0,
       offsetY: 0,
     });
-    const overlapCount = countPeakConflicts(rect);
+    const conflict = countConflicts(rect);
     const overflow = calcRectOverflow(rect, chartBounds);
     const distance = Math.abs(candidateIndex - labelCenterIndex);
-    const score = overlapCount * 100000 + overflow * 1200 + distance;
+    const score =
+      conflict.peakCount * 100000 +
+      conflict.labelCount * 130000 +
+      overflow * 1200 +
+      distance;
 
     if (!bestCandidate || score < bestCandidate.score) {
       bestCandidate = {
         score,
         candidateIndex,
-        overlapCount,
+        peakCount: conflict.peakCount,
+        labelCount: conflict.labelCount,
         overflow,
       };
     }
 
-    if (overlapCount === 0 && overflow === 0 && distance > 0) {
+    if (conflict.peakCount === 0 && conflict.labelCount === 0 && overflow === 0 && distance > 0) {
       break;
     }
   }
@@ -1854,8 +1879,8 @@ function resolveDrawdownValueLabelOffset(anchorX, anchorY, peakLabelRects, chart
 
   const labelLines = ["累计跌幅", "00.0%"];
   const labelBox = estimateLabelBox(labelLines, 14, [2, 4], 700);
-  const maxOffsetPx = 12;
-  const offsetCandidates = [0, 6, -6, 10, -10, 12, -12].filter(
+  const maxOffsetPx = 24;
+  const offsetCandidates = [0, -4, 4, -8, 8, -12, 12, -16, 16, -20, 20, -24, 24].filter(
     (offsetY) => Math.abs(offsetY) <= maxOffsetPx,
   );
 
@@ -1871,11 +1896,11 @@ function resolveDrawdownValueLabelOffset(anchorX, anchorY, peakLabelRects, chart
     });
 
     const overlapCount = peakLabelRects.reduce(
-      (count, peakRect) => (rectsOverlap(rect, peakRect, 3) ? count + 1 : count),
+      (count, peakRect) => (rectsOverlap(rect, peakRect, 5) ? count + 1 : count),
       0,
     );
     const overflow = calcRectOverflow(rect, chartBounds);
-    const score = overlapCount * 10000 + overflow * 180 + Math.abs(offsetY) * 8;
+    const score = overlapCount * 1000000 + overflow * 220 + Math.abs(offsetY) * 4;
     if (!best || score < best.score) {
       best = { score, offsetY, overlapCount, overflow };
     }
@@ -1992,6 +2017,8 @@ function makeOption(
     bottom: Math.max(9, chartHeight - 8),
   };
   const peakLabelRects = buildPeakLabelRectList(rendered, peakLabelLayouts, toPixelCoord);
+  const occupiedDrawdownLabelRects = [];
+  const occupiedRecoverLabelRects = [];
 
   return {
     backgroundColor: "#ffffff",
@@ -2203,7 +2230,208 @@ function makeOption(
           drawdownLabelBox.height,
           drawdownLabelOffset[1] || 0,
         );
-        const labelCenterValue = drawdownVerticalLayout.labelCenterValue;
+        let labelCenterValue = drawdownVerticalLayout.labelCenterValue;
+        const valuePerPixel = yRange / Math.max(1, plotHeight);
+        const occupiedLabelRects = occupiedDrawdownLabelRects.concat(occupiedRecoverLabelRects);
+        const centerMin = drawdown.latestValue + drawdownVerticalLayout.halfGapValue + 0.2;
+        const centerMax = drawdown.peakValue - drawdownVerticalLayout.halfGapValue - 0.2;
+        let drawdownLabelOffsetX = 0;
+        if (centerMin <= centerMax) {
+          const centerShiftPxCandidates = [0, -4, 4, -8, 8, -12, 12, -16, 16, -20, 20, -24, 24, -28, 28];
+          const centerShiftXCandidates = [0, -8, 8, -14, 14];
+          let bestCenter = null;
+          for (const shiftPx of centerShiftPxCandidates) {
+            for (const shiftX of centerShiftXCandidates) {
+              const candidateCenter = clampNumber(
+                labelCenterValue - shiftPx * valuePerPixel,
+                centerMin,
+                centerMax,
+              );
+              const candidateCoord = toPixelCoord(drawdown.peakMonth, candidateCenter);
+              if (!candidateCoord) continue;
+              const candidateRect = buildLabelRect({
+                anchorX: candidateCoord.x,
+                anchorY: candidateCoord.y,
+                width: drawdownLabelBox.width + 10,
+                height: drawdownLabelBox.height + 6,
+                position: "inside",
+                offsetX: shiftX,
+              });
+
+              let peakOverlapCount = 0;
+              let peakNearCount = 0;
+              for (const peakRect of peakLabelRects) {
+                if (!peakRect) continue;
+                if (rectsOverlap(candidateRect, peakRect, 8)) {
+                  peakOverlapCount += 1;
+                  continue;
+                }
+                const candidateCenterX = candidateRect.x + candidateRect.width / 2;
+                const peakCenterX = peakRect.x + peakRect.width / 2;
+                const dx = Math.abs(candidateCenterX - peakCenterX);
+                const candidateBottom = candidateRect.y + candidateRect.height;
+                const peakBottom = peakRect.y + peakRect.height;
+                const verticalGap = Math.max(peakRect.y - candidateBottom, candidateRect.y - peakBottom, 0);
+                const nearX = dx <= Math.max(candidateRect.width, peakRect.width) * 0.42;
+                const nearY = verticalGap <= 12;
+                if (nearX && nearY) {
+                  peakNearCount += 1;
+                }
+              }
+
+              let labelOverlapCount = 0;
+              let labelNearCount = 0;
+              for (const occupiedRect of occupiedLabelRects) {
+                if (!occupiedRect) continue;
+                if (rectsOverlap(candidateRect, occupiedRect, 6)) {
+                  labelOverlapCount += 1;
+                  continue;
+                }
+                const candidateCenterX = candidateRect.x + candidateRect.width / 2;
+                const occupiedCenterX = occupiedRect.x + occupiedRect.width / 2;
+                const dx = Math.abs(candidateCenterX - occupiedCenterX);
+                const candidateBottom = candidateRect.y + candidateRect.height;
+                const occupiedBottom = occupiedRect.y + occupiedRect.height;
+                const verticalGap = Math.max(
+                  occupiedRect.y - candidateBottom,
+                  candidateRect.y - occupiedBottom,
+                  0,
+                );
+                const nearX = dx <= Math.max(candidateRect.width, occupiedRect.width) * 0.46;
+                const nearY = verticalGap <= 10;
+                if (nearX && nearY) {
+                  labelNearCount += 1;
+                }
+              }
+
+              const overflow = calcRectOverflow(candidateRect, labelBounds);
+              const score =
+                peakOverlapCount * 2000000 +
+                peakNearCount * 450000 +
+                labelOverlapCount * 1500000 +
+                labelNearCount * 550000 +
+                overflow * 220 +
+                Math.abs(shiftPx) * 4 +
+                Math.abs(shiftX) * 12;
+              if (!bestCenter || score < bestCenter.score) {
+                bestCenter = {
+                  score,
+                  candidateCenter,
+                  shiftX,
+                  peakOverlapCount,
+                  peakNearCount,
+                  labelOverlapCount,
+                  labelNearCount,
+                  overflow,
+                };
+              }
+              if (
+                peakOverlapCount === 0 &&
+                peakNearCount === 0 &&
+                labelOverlapCount === 0 &&
+                labelNearCount === 0 &&
+                overflow === 0
+              ) {
+                break;
+              }
+            }
+          }
+          if (bestCenter) {
+            labelCenterValue = bestCenter.candidateCenter;
+            drawdownLabelOffsetX = bestCenter.shiftX || 0;
+          }
+        }
+        const evaluateDrawdownRectConflict = (rect) => {
+          if (!rect) return { overlapCount: 0, nearCount: 0, overflow: 0 };
+
+          let overlapCount = 0;
+          let nearCount = 0;
+          const allAvoidRects = peakLabelRects.concat(occupiedLabelRects);
+          for (const avoidRect of allAvoidRects) {
+            if (!avoidRect) continue;
+            if (rectsOverlap(rect, avoidRect, 8)) {
+              overlapCount += 1;
+              continue;
+            }
+
+            const rectCenterX = rect.x + rect.width / 2;
+            const avoidCenterX = avoidRect.x + avoidRect.width / 2;
+            const dx = Math.abs(rectCenterX - avoidCenterX);
+            const rectBottom = rect.y + rect.height;
+            const avoidBottom = avoidRect.y + avoidRect.height;
+            const verticalGap = Math.max(avoidRect.y - rectBottom, rect.y - avoidBottom, 0);
+            const nearX = dx <= Math.max(rect.width, avoidRect.width) * 0.52;
+            const nearY = verticalGap <= 14;
+            if (nearX && nearY) {
+              nearCount += 1;
+            }
+          }
+
+          return {
+            overlapCount,
+            nearCount,
+            overflow: calcRectOverflow(rect, labelBounds),
+          };
+        };
+
+        const toDrawdownRect = (centerValue, offsetX) => {
+          const coord = toPixelCoord(drawdown.peakMonth, centerValue);
+          if (!coord) return null;
+          return buildLabelRect({
+            anchorX: coord.x,
+            anchorY: coord.y,
+            width: drawdownLabelBox.width + 10,
+            height: drawdownLabelBox.height + 6,
+            position: "inside",
+            offsetX,
+          });
+        };
+
+        const initialRect = toDrawdownRect(labelCenterValue, drawdownLabelOffsetX);
+        const initialConflict = evaluateDrawdownRectConflict(initialRect);
+        if (centerMin <= centerMax && (initialConflict.overlapCount > 0 || initialConflict.nearCount > 0)) {
+          const aggressiveShiftYCandidates = [0, -10, 10, -16, 16, -22, 22, -28, 28, -34, 34, -40, 40];
+          const aggressiveShiftXCandidates = [0, -10, 10, -18, 18, -26, 26];
+          let bestAggressive = null;
+          for (const shiftY of aggressiveShiftYCandidates) {
+            for (const shiftX of aggressiveShiftXCandidates) {
+              const candidateCenter = clampNumber(
+                labelCenterValue - shiftY * valuePerPixel,
+                centerMin,
+                centerMax,
+              );
+              const candidateOffsetX = drawdownLabelOffsetX + shiftX;
+              const candidateRect = toDrawdownRect(candidateCenter, candidateOffsetX);
+              const conflict = evaluateDrawdownRectConflict(candidateRect);
+              const score =
+                conflict.overlapCount * 3000000 +
+                conflict.nearCount * 700000 +
+                conflict.overflow * 260 +
+                Math.abs(shiftY) * 3 +
+                Math.abs(candidateOffsetX) * 10;
+              if (!bestAggressive || score < bestAggressive.score) {
+                bestAggressive = {
+                  score,
+                  candidateCenter,
+                  candidateOffsetX,
+                  conflict,
+                };
+              }
+              if (
+                conflict.overlapCount === 0 &&
+                conflict.nearCount === 0 &&
+                conflict.overflow === 0
+              ) {
+                break;
+              }
+            }
+          }
+          if (bestAggressive) {
+            labelCenterValue = bestAggressive.candidateCenter;
+            drawdownLabelOffsetX = bestAggressive.candidateOffsetX;
+          }
+        }
+
         const upperSegmentEnd = labelCenterValue + drawdownVerticalLayout.halfGapValue;
         const lowerSegmentStart = labelCenterValue - drawdownVerticalLayout.halfGapValue;
 
@@ -2239,10 +2467,23 @@ function makeOption(
             fontWeight: 700,
             backgroundColor: CHART_TEXT_MASK_COLOR,
             padding: [2, 4],
-            offset: [0, 0],
+            offset: [drawdownLabelOffsetX, 0],
             formatter: `累计跌幅\n${Math.abs(drawdown.drawdownPct).toFixed(1)}%`,
           },
         });
+        const finalDrawdownCoord = toPixelCoord(drawdown.peakMonth, labelCenterValue);
+        if (finalDrawdownCoord) {
+          occupiedDrawdownLabelRects.push(
+            buildLabelRect({
+              anchorX: finalDrawdownCoord.x,
+              anchorY: finalDrawdownCoord.y,
+              width: drawdownLabelBox.width + 10,
+              height: drawdownLabelBox.height + 6,
+              position: "inside",
+              offsetX: drawdownLabelOffsetX,
+            }),
+          );
+        }
 
         const recoverLabelText = drawdown.recoverMonth
           ? `跌回 ${drawdown.recoverMonth.replace("-", ".")}`
@@ -2262,6 +2503,7 @@ function makeOption(
           peakLabelRects,
           labelBounds,
           recoverLabelBox,
+          occupiedDrawdownLabelRects.concat(occupiedRecoverLabelRects),
         );
         const hasHorizontalLayout = Boolean(horizontalLayout);
         const recoverDisplayMonth = hasHorizontalLayout
@@ -2342,6 +2584,18 @@ function makeOption(
               formatter: recoverLabelText,
             },
           });
+          const recoverCoord = toPixelCoord(months[labelCenterIndex], drawdown.latestValue);
+          if (recoverCoord) {
+            occupiedRecoverLabelRects.push(
+              buildLabelRect({
+                anchorX: recoverCoord.x,
+                anchorY: recoverCoord.y,
+                width: recoverLabelBox.width + 8,
+                height: recoverLabelBox.height + 6,
+                position: "inside",
+              }),
+            );
+          }
         }
       }
 
