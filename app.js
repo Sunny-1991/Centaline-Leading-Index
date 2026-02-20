@@ -1281,12 +1281,66 @@ async function captureChartStageSnapshot(pixelRatio = 2) {
 
   const stageRect = chartStageEl.getBoundingClientRect();
   if (!stageRect.width || !stageRect.height) return null;
-  const stageCanvas = await window.html2canvas(chartStageEl, {
-    backgroundColor: "#ffffff",
-    scale: pixelRatio,
-    useCORS: true,
-    logging: false,
-  });
+  const option = chart.getOption?.() || {};
+  const toolboxShow = option.toolbox?.[0]?.show !== false;
+  const sliderDataZoom = Array.isArray(option.dataZoom)
+    ? option.dataZoom.find((item) => item?.type === "slider")
+    : null;
+  const sliderShow = sliderDataZoom ? sliderDataZoom.show !== false : true;
+  const gridBottomRaw = option.grid?.[0]?.bottom;
+  const gridBottom = Number.isFinite(Number(gridBottomRaw))
+    ? Number(gridBottomRaw)
+    : CHART_GRID_LAYOUT.bottom;
+  const exportGridBottom = Math.max(72, gridBottom - 28);
+
+  const hideOption = {
+    toolbox: {
+      show: false,
+    },
+    grid: {
+      bottom: exportGridBottom,
+    },
+  };
+  if (sliderDataZoom) {
+    hideOption.dataZoom = [
+      {
+        type: "slider",
+        show: false,
+      },
+    ];
+  }
+  chart.setOption(hideOption, { lazyUpdate: false });
+
+  let stageCanvas = null;
+  try {
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    stageCanvas = await window.html2canvas(chartStageEl, {
+      backgroundColor: "#ffffff",
+      scale: pixelRatio,
+      useCORS: true,
+      logging: false,
+    });
+  } finally {
+    const restoreOption = {
+      toolbox: {
+        show: toolboxShow,
+      },
+      grid: {
+        bottom: gridBottom,
+      },
+    };
+    if (sliderDataZoom) {
+      restoreOption.dataZoom = [
+        {
+          type: "slider",
+          show: sliderShow,
+        },
+      ];
+    }
+    chart.setOption(restoreOption, { lazyUpdate: false });
+  }
+
+  if (!stageCanvas) return null;
   return {
     dataURL: stageCanvas.toDataURL("image/png"),
   };
