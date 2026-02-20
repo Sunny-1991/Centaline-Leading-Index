@@ -1,8 +1,29 @@
-const raw = window.HOUSE_PRICE_SOURCE_DATA;
+let raw = null;
+let activeSourceMeta = null;
+
+const SOURCE_CONFIGS = [
+  {
+    key: "centaline6",
+    label: "中原领先指数（6城）",
+    sourceTitle: "中原领先指数（月度）",
+    heroSubtitle: "数据来源：Wind、中原研究中心",
+    defaultSelectedNames: null,
+    data: window.HOUSE_PRICE_SOURCE_DATA,
+  },
+  {
+    key: "nbs70",
+    label: "国家统计局（二手住宅70城）",
+    sourceTitle: "国家统计局70城二手住宅销售价格指数（上月=100，链式定基）",
+    heroSubtitle: "数据来源：国家统计局（70城二手住宅销售价格指数）",
+    defaultSelectedNames: ["北京", "上海", "广州", "深圳", "天津", "重庆"],
+    data: window.HOUSE_PRICE_SOURCE_DATA_NBS_70,
+  },
+];
 
 const cityListEl = document.getElementById("cityList");
 const startMonthEl = document.getElementById("startMonth");
 const endMonthEl = document.getElementById("endMonth");
+const dataSourceEl = document.getElementById("dataSource");
 const renderBtn = document.getElementById("renderBtn");
 const selectAllBtn = document.getElementById("selectAllBtn");
 const clearAllBtn = document.getElementById("clearAllBtn");
@@ -15,6 +36,7 @@ const chartMetaEl = document.getElementById("chartMeta");
 const footnoteEl = document.getElementById("footnoteText");
 const chartStatsOverlayEl = document.getElementById("chartStatsOverlay");
 const chartEl = document.getElementById("chart");
+const sourceSubtitleEl = document.getElementById("sourceSubtitleText");
 
 const chart = echarts.init(chartEl, null, {
   renderer: "canvas",
@@ -90,6 +112,70 @@ function formatMonthZh(month) {
 function setStatus(text, isError = false) {
   statusEl.textContent = text;
   statusEl.classList.toggle("error", isError);
+}
+
+function isUsableSourceData(data) {
+  return Boolean(
+    data &&
+      Array.isArray(data.dates) &&
+      data.dates.length > 0 &&
+      Array.isArray(data.cities) &&
+      data.cities.length > 0 &&
+      data.values &&
+      typeof data.values === "object",
+  );
+}
+
+function listAvailableSources() {
+  return SOURCE_CONFIGS.filter((source) => isUsableSourceData(source.data));
+}
+
+function findSourceByKey(sourceKey) {
+  const available = listAvailableSources();
+  const matched = available.find((source) => source.key === sourceKey);
+  return matched || available[0] || null;
+}
+
+function populateSourceSelector(availableSources) {
+  if (!dataSourceEl) return;
+  dataSourceEl.innerHTML = availableSources
+    .map((source) => `<option value="${source.key}">${source.label}</option>`)
+    .join("");
+  dataSourceEl.disabled = availableSources.length <= 1;
+}
+
+function buildCityMaps() {
+  cityById.clear();
+  cityValidRanges.clear();
+  raw.cities.forEach((city) => {
+    cityById.set(city.id, city);
+    cityValidRanges.set(city.id, getSeriesValidRange(city.id, city.availableRange));
+  });
+}
+
+function applyDataSource(sourceKey) {
+  const source = findSourceByKey(sourceKey);
+  if (!source) return false;
+
+  raw = source.data;
+  activeSourceMeta = source;
+  if (sourceSubtitleEl) {
+    sourceSubtitleEl.textContent = source.heroSubtitle;
+  }
+  if (dataSourceEl && dataSourceEl.value !== source.key) {
+    dataSourceEl.value = source.key;
+  }
+
+  uiState.hiddenCityNames.clear();
+  uiState.zoomStartMonth = null;
+  uiState.zoomEndMonth = null;
+  uiState.showDrawdownAnalysis = false;
+  uiState.showChartTable = true;
+
+  buildCityMaps();
+  buildCityControls(raw.cities, source.defaultSelectedNames);
+  buildMonthSelects(raw.dates);
+  return true;
 }
 
 function clampNumber(value, min, max) {
@@ -387,8 +473,12 @@ function getSelectedEffectiveRange(selectedCityIds) {
   };
 }
 
-function buildCityControls(cities) {
+function buildCityControls(cities, defaultSelectedNames = null) {
   cityListEl.innerHTML = "";
+  const preferredNameSet =
+    Array.isArray(defaultSelectedNames) && defaultSelectedNames.length > 0
+      ? new Set(defaultSelectedNames)
+      : null;
   const orderedCities = [...cities].sort((a, b) => {
     const aRank = OVERLAY_CITY_ORDER_INDEX.has(a.name)
       ? OVERLAY_CITY_ORDER_INDEX.get(a.name)
@@ -406,7 +496,7 @@ function buildCityControls(cities) {
     const input = document.createElement("input");
     input.type = "checkbox";
     input.value = city.id;
-    input.checked = true;
+    input.checked = preferredNameSet ? preferredNameSet.has(city.name) : true;
     const text = document.createElement("span");
     text.textContent = city.name;
     label.append(input, text);
@@ -428,8 +518,21 @@ function buildMonthSelects(dates) {
   endMonthEl.value = defaultEnd;
 }
 
+function colorFromCityName(cityName = "", index = 0) {
+  const text = String(cityName);
+  let hash = 0;
+  for (let i = 0; i < text.length; i += 1) {
+    hash = (hash * 131 + text.charCodeAt(i)) >>> 0;
+  }
+  const seed = (hash + index * 47) % 360;
+  const hue = (seed * 11) % 360;
+  return `hsl(${hue}, 56%, 42%)`;
+}
+
 function getColor(cityName, index) {
-  return namedColorMap[cityName] || fallbackPalette[index % fallbackPalette.length];
+  if (namedColorMap[cityName]) return namedColorMap[cityName];
+  if (index < fallbackPalette.length) return fallbackPalette[index];
+  return colorFromCityName(cityName, index);
 }
 
 function getLastFiniteInfo(values, dates) {
@@ -1973,7 +2076,8 @@ function render() {
   chart.dispatchAction({ type: "hideTip" });
   chart.dispatchAction({ type: "updateAxisPointer", currTrigger: "leave" });
   chartTitleEl.textContent = `热点城市二手房价格走势图`;
-  chartMetaEl.textContent = `${formatMonthZh(viewportStartMonth)} - ${formatMonthZh(viewportEndMonth)} | 定基 ${formatMonthZh(viewportStartMonth)} = 100`;
+  const sourceLabelShort = activeSourceMeta?.label || "中原领先指数（6城）";
+  chartMetaEl.textContent = `${formatMonthZh(viewportStartMonth)} - ${formatMonthZh(viewportEndMonth)} | 定基 ${formatMonthZh(viewportStartMonth)} = 100 | ${sourceLabelShort}`;
 
   renderSummaryTable(visibleSummaryRows);
   renderChartStatsOverlay(visibleSummaryRows, viewportStartMonth, viewportEndMonth);
@@ -1988,7 +2092,8 @@ function render() {
   const analysisText = uiState.showDrawdownAnalysis
     ? "已显示累计跌幅与跌回示意。"
     : "";
-  footnoteEl.textContent = `数据源：中原领先指数（月度）。${modeText}当前滑块区间：${viewportStartMonth} ~ ${viewportEndMonth}。${analysisText}${missingText}${noDataText}`;
+  const sourceLabel = activeSourceMeta?.sourceTitle || "中原领先指数（月度）";
+  footnoteEl.textContent = `数据源：${sourceLabel}。${modeText}当前滑块区间：${viewportStartMonth} ~ ${viewportEndMonth}。${analysisText}${missingText}${noDataText}`;
 
   const statusMessage = wasAutoAdjusted
     ? `你选择的区间超出有效数据范围，已自动调整为 ${startMonth} ~ ${endMonth}；当前滑块区间 ${viewportStartMonth} ~ ${viewportEndMonth}（定基 ${viewportStartMonth}=100）。`
@@ -1997,6 +2102,17 @@ function render() {
 }
 
 function bindEvents() {
+  if (dataSourceEl) {
+    dataSourceEl.addEventListener("change", () => {
+      const applied = applyDataSource(dataSourceEl.value);
+      if (!applied) {
+        setStatus("数据源切换失败，请刷新重试。", true);
+        return;
+      }
+      render();
+    });
+  }
+
   renderBtn.addEventListener("click", () => {
     uiState.hiddenCityNames.clear();
     render();
@@ -2115,20 +2231,21 @@ function bindEvents() {
 }
 
 function init() {
-  if (!raw || !Array.isArray(raw.dates) || !Array.isArray(raw.cities) || !raw.values) {
-    setStatus("数据加载失败，请先生成 house-price-data.js。", true);
+  const availableSources = listAvailableSources();
+  if (availableSources.length === 0) {
+    setStatus("数据加载失败，请先生成 house-price-data.js / house-price-data-nbs-70.js。", true);
     return;
   }
 
-  cityById.clear();
-  cityValidRanges.clear();
-  raw.cities.forEach((city) => {
-    cityById.set(city.id, city);
-    cityValidRanges.set(city.id, getSeriesValidRange(city.id, city.availableRange));
-  });
+  populateSourceSelector(availableSources);
+  const defaultSource =
+    availableSources.find((source) => source.key === "centaline6") || availableSources[0];
+  const applied = applyDataSource(defaultSource.key);
+  if (!applied) {
+    setStatus("初始化数据源失败，请刷新页面重试。", true);
+    return;
+  }
 
-  buildCityControls(raw.cities);
-  buildMonthSelects(raw.dates);
   bindEvents();
   bindChartWheelToPageScroll();
   render();

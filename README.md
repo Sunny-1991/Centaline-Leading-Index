@@ -17,10 +17,13 @@ house-price-dashboard/
 ├── app.js                             # 图表渲染与交互逻辑
 ├── house-price-data.js                # 前端直接读取的数据源
 ├── house-price-data.json              # 与 JS 同步的数据快照（便于检查）
+├── house-price-data-nbs-70.js         # 国家统计局 70 城二手住宅数据源（前端直读）
+├── house-price-data-nbs-70.json       # NBS 数据快照
 ├── hk-centaline-monthly.json          # 香港 CCL 月度数据缓存
 └── scripts/
     ├── extract-house-price-data.mjs   # 从 Excel 提取数据并生成前端数据文件
     └── fetch-hk-centaline-monthly.mjs # 从中原官网抓取周度数据并转月度
+    └── fetch-nbs-70city-secondhand.mjs # 抓取国家统计局 70 城二手住宅月度数据
 ```
 
 ---
@@ -35,7 +38,7 @@ house-price-dashboard/
 - Netlify
 - Vercel
 
-部署目录：`house-price-dashboard/`（确保包含 `index.html`、`app.js`、`style.css`、`house-price-data.js`）。
+部署目录：`house-price-dashboard/`（确保包含 `index.html`、`app.js`、`style.css`、`house-price-data.js`、`house-price-data-nbs-70.js`）。
 
 ### 方案 B：本地部署（通用）
 ```bash
@@ -75,6 +78,16 @@ node house-price-dashboard/scripts/extract-house-price-data.mjs "<你的Excel路
   - `house-price-dashboard/house-price-data.js`
   - `house-price-dashboard/house-price-data.json`
 
+### 第三步：更新国家统计局 70 城二手住宅数据源
+```bash
+cd "<项目根目录>/house-price-dashboard"
+node scripts/fetch-nbs-70city-secondhand.mjs
+```
+
+生成/更新：
+- `house-price-dashboard/house-price-data-nbs-70.js`
+- `house-price-dashboard/house-price-data-nbs-70.json`
+
 ---
 
 ## 4. 常用命令（带参数）
@@ -104,11 +117,12 @@ node house-price-dashboard/scripts/fetch-hk-centaline-monthly.mjs \
 
 ## 5. 页面使用说明
 
-1. 左侧勾选城市（支持全选/清空）。  
-2. 选择起点与终点月份。  
-3. 点击“**一键生成**”绘图。  
-4. 需要时开启“累计跌幅”与“表格汇总”。  
-5. 右上角工具箱可导出图片（标准/超清）。  
+1. 左侧先选择数据源（中原 6 城 / 国家统计局 70 城）。  
+2. 勾选城市（支持全选/清空）。  
+3. 选择起点与终点月份。  
+4. 点击“**一键生成**”绘图。  
+5. 需要时开启“累计跌幅”与“表格汇总”。  
+6. 右上角工具箱可导出图片（标准/超清）。  
 
 补充：
 - 点击图例或曲线可隐藏/显示某城市。
@@ -121,7 +135,7 @@ node house-price-dashboard/scripts/fetch-hk-centaline-monthly.mjs \
 - 默认输出月份从 `2008-01` 开始（脚本内 `OUTPUT_MIN_MONTH` 限制）。  
 - 香港数据来自中原官网 CCL 周度序列，按“月末最后一周”转月度。  
 - 输出数据当前统一为 `2008-01 = 100`，页面会再按用户所选起点统一重定基为 `100`。  
-- 当前脚本默认排除 `成都`（因该城市缺少 `2008-01` 基准点）。  
+- 国家统计局数据源来自 `data.stats.gov.cn`，指标为 `二手住宅销售价格指数(上月=100)`，并在本地做链式定基（`2008-01 = 100`）。  
 
 ---
 

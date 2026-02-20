@@ -13,6 +13,7 @@
     <link rel="stylesheet" href="style.css" />
     <script defer src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
     <script defer src="house-price-data.js"></script>
+    <script defer src="house-price-data-nbs-70.js"></script>
     <script defer src="app.js"></script>
   </head>
   <body>
@@ -20,13 +21,21 @@
       <section class="hero">
         <p class="eyebrow">Centaline Leading Index</p>
         <h1>房价可视化</h1>
-        <p class="subtitle">数据来源：Wind、中原研究中心</p>
+        <p class="subtitle" id="sourceSubtitleText">数据来源：Wind、中原研究中心</p>
         <p class="subtitle credit">数据整合与图表制作：公众号 - 一座独立屋</p>
       </section>
 
       <section class="workspace">
         <aside class="controls">
           <h2>设置</h2>
+
+          <div class="control-block">
+            <h3>数据源</h3>
+            <label>
+              选择数据源
+              <select id="dataSource" aria-label="数据源选择"></select>
+            </label>
+          </div>
 
           <div class="control-block">
             <div class="block-head">
