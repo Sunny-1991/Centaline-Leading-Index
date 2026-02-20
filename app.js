@@ -87,7 +87,7 @@ const OVERLAY_TOP_RATIO = 0.05;
 const OVERLAY_SCALE_MIN = 0.72;
 const OVERLAY_SCALE_MAX = 1.3;
 const OVERLAY_TABLE_SCALE = 1.05;
-const CHART_TEXT_MASK_COLOR = "rgba(255, 255, 255, 0.56)";
+const CHART_TEXT_MASK_COLOR = "rgba(255, 255, 255, 0.36)";
 const CHART_GRID_LAYOUT = Object.freeze({
   left: 70,
   right: 90,
