@@ -5,6 +5,7 @@ const SOURCE_CONFIGS = [
   {
     key: "centaline6",
     label: "中原领先指数（6城）",
+    legendLabel: "中原",
     sourceTitle: "中原领先指数（月度）",
     heroSubtitle: "数据来源：Wind、中原研究中心",
     defaultSelectedNames: null,
@@ -13,6 +14,7 @@ const SOURCE_CONFIGS = [
   {
     key: "nbs70",
     label: "国家统计局（二手住宅70城）",
+    legendLabel: "统计局",
     sourceTitle: "国家统计局70城二手住宅销售价格指数（上月=100，链式定基）",
     heroSubtitle: "数据来源：国家统计局（70城二手住宅销售价格指数）",
     defaultSelectedNames: ["北京", "上海", "广州", "深圳", "天津", "重庆"],
@@ -24,6 +26,8 @@ const cityListEl = document.getElementById("cityList");
 const startMonthEl = document.getElementById("startMonth");
 const endMonthEl = document.getElementById("endMonth");
 const dataSourceEl = document.getElementById("dataSource");
+const compareSourceEl = document.getElementById("compareSource");
+const compareHintEl = document.getElementById("compareHint");
 const renderBtn = document.getElementById("renderBtn");
 const selectAllBtn = document.getElementById("selectAllBtn");
 const clearAllBtn = document.getElementById("clearAllBtn");
@@ -72,6 +76,8 @@ const CHART_GRID_LAYOUT = Object.freeze({
   top: 44,
   bottom: 112,
 });
+const MAX_SELECTED_CITY_COUNT = 6;
+const COMPARE_CITY_WHITELIST = new Set(["北京", "上海", "广州", "深圳", "天津"]);
 const cityById = new Map();
 const cityValidRanges = new Map();
 const uiState = {
@@ -175,7 +181,97 @@ function applyDataSource(sourceKey) {
   buildCityMaps();
   buildCityControls(raw.cities, source.defaultSelectedNames);
   buildMonthSelects(raw.dates);
+  refreshCompareSourceControl({ keepSelection: false });
   return true;
+}
+
+function getAlternateSourcesForCompare() {
+  return listAvailableSources().filter((source) => source.key !== activeSourceMeta?.key);
+}
+
+function getCompareEligibility(selectedCityIds = readSelectedCityIds()) {
+  if (selectedCityIds.length !== 1) {
+    return {
+      eligible: false,
+      cityName: null,
+      reason: "仅在单选城市时可开启跨源对比",
+    };
+  }
+  const selectedCity = cityById.get(selectedCityIds[0]);
+  if (!selectedCity) {
+    return {
+      eligible: false,
+      cityName: null,
+      reason: "当前城市不存在",
+    };
+  }
+  if (!COMPARE_CITY_WHITELIST.has(selectedCity.name)) {
+    return {
+      eligible: false,
+      cityName: selectedCity.name,
+      reason: "仅支持北上广深天津单城对比",
+    };
+  }
+  return {
+    eligible: true,
+    cityName: selectedCity.name,
+    reason: "",
+  };
+}
+
+function refreshCompareSourceControl({ keepSelection = true } = {}) {
+  if (!compareSourceEl) return;
+
+  const previousValue = compareSourceEl.value || "none";
+  const alternatives = getAlternateSourcesForCompare();
+  const eligibility = getCompareEligibility();
+
+  const options = ['<option value="none">不对比</option>']
+    .concat(
+      alternatives.map(
+        (source) => `<option value="${source.key}">${source.label}</option>`,
+      ),
+    )
+    .join("");
+  compareSourceEl.innerHTML = options;
+
+  const canEnable = eligibility.eligible && alternatives.length > 0;
+  compareSourceEl.disabled = !canEnable;
+
+  let nextValue = "none";
+  if (canEnable && keepSelection && alternatives.some((source) => source.key === previousValue)) {
+    nextValue = previousValue;
+  }
+  compareSourceEl.value = nextValue;
+
+  if (compareHintEl) {
+    if (!eligibility.eligible) {
+      compareHintEl.textContent = eligibility.reason;
+    } else if (!canEnable) {
+      compareHintEl.textContent = "暂无可用于对比的其他数据源";
+    } else if (nextValue === "none") {
+      compareHintEl.textContent = `可对 ${eligibility.cityName} 开启跨源对比`;
+    } else {
+      const matched = alternatives.find((source) => source.key === nextValue);
+      compareHintEl.textContent = `已开启 ${eligibility.cityName} 与${matched?.label || "另一数据源"}对比`;
+    }
+  }
+}
+
+function enforceCitySelectionLimit(lastChangedInput = null) {
+  const checkedInputs = [...cityListEl.querySelectorAll('input[type="checkbox"]:checked')];
+  if (checkedInputs.length <= MAX_SELECTED_CITY_COUNT) {
+    return true;
+  }
+
+  if (lastChangedInput && lastChangedInput.checked) {
+    lastChangedInput.checked = false;
+  } else {
+    checkedInputs.slice(MAX_SELECTED_CITY_COUNT).forEach((input) => {
+      input.checked = false;
+    });
+  }
+  return false;
 }
 
 function clampNumber(value, min, max) {
@@ -549,6 +645,39 @@ function getLastFiniteIndex(values) {
     if (isFiniteNumber(values[i])) return i;
   }
   return -1;
+}
+
+function alignSeriesByMonths(dataset, series, months) {
+  const monthToValue = new Map();
+  dataset.dates.forEach((month, index) => {
+    monthToValue.set(month, series[index]);
+  });
+  return months.map((month) => {
+    const value = monthToValue.get(month);
+    return isFiniteNumber(value) ? value : null;
+  });
+}
+
+function resolveCompareContext(selectedCityIds) {
+  if (!compareSourceEl) return null;
+
+  const compareSourceKey = compareSourceEl.value;
+  if (!compareSourceKey || compareSourceKey === "none") return null;
+
+  const eligibility = getCompareEligibility(selectedCityIds);
+  if (!eligibility.eligible) return null;
+
+  const compareSource = findSourceByKey(compareSourceKey);
+  if (!compareSource || compareSource.key === activeSourceMeta?.key) return null;
+
+  const compareCity = compareSource.data?.cities?.find((city) => city.name === eligibility.cityName);
+  if (!compareCity) return null;
+
+  return {
+    cityName: eligibility.cityName,
+    source: compareSource,
+    city: compareCity,
+  };
 }
 
 function calcPctChange(currentValue, baseValue) {
@@ -1788,8 +1917,10 @@ function makeOption(
         showSymbol: false,
         connectNulls: false,
         lineStyle: {
-          width: seriesLineWidth,
+          width: seriesLineWidth * (item.lineWidthScale || 1),
           color: item.color,
+          type: item.lineType || "solid",
+          opacity: item.lineOpacity ?? 1,
         },
         itemStyle: {
           color: item.color,
@@ -1849,6 +1980,8 @@ function render() {
   syncChartViewport();
   latestRenderContext = null;
   const selectedCityIds = readSelectedCityIds();
+  refreshCompareSourceControl({ keepSelection: true });
+  const compareContext = resolveCompareContext(selectedCityIds);
   const requestedStartMonth = startMonthEl.value;
   const requestedEndMonth = endMonthEl.value;
 
@@ -1860,6 +1993,11 @@ function render() {
     updateChartTableButton(0);
     renderChartStatsOverlay([], requestedStartMonth, requestedEndMonth);
     setStatus("请至少选择一个城市。", true);
+    return;
+  }
+
+  if (selectedCityIds.length > MAX_SELECTED_CITY_COUNT) {
+    setStatus(`一次最多选择 ${MAX_SELECTED_CITY_COUNT} 个城市，请减少勾选后再生成。`, true);
     return;
   }
 
@@ -1950,18 +2088,26 @@ function render() {
   const summaryRows = [];
   let drawdownEligibleCount = 0;
 
-  selectedCityIds.forEach((cityId, idx) => {
-    const city = cityById.get(cityId);
-    const series = raw.values[cityId];
-    if (!city || !Array.isArray(series)) return;
+  const activeSourceLegend = activeSourceMeta?.legendLabel || activeSourceMeta?.label || "当前源";
+  const compareSourceLegend = compareContext?.source?.legendLabel || compareContext?.source?.label || "对比源";
+  let compareSeriesRendered = false;
 
-    const sliced = series.slice(startIndex, endIndex + 1);
-    const baseRaw = sliced[viewportStartOffset];
+  function appendSeries({
+    city,
+    seriesRaw,
+    displayName,
+    colorIndex,
+    lineType = "solid",
+    lineWidthScale = 1,
+    lineOpacity = 1,
+    allowAnnotations = true,
+  }) {
+    const baseRaw = seriesRaw[viewportStartOffset];
     if (!isFiniteNumber(baseRaw) || baseRaw <= 0) {
-      missingBase.push(city.name);
-      return;
+      missingBase.push(displayName);
+      return false;
     }
-    const normalized = sliced.map((value) => {
+    const normalized = seriesRaw.map((value) => {
       if (!isFiniteNumber(value)) return null;
       return (value / baseRaw) * 100;
     });
@@ -1969,7 +2115,7 @@ function render() {
 
     const validValues = viewportNormalized.filter(isFiniteNumber);
     if (validValues.length === 0) {
-      noDataCities.push(city.name);
+      noDataCities.push(displayName);
     }
 
     const peakValue = validValues.length > 0 ? Math.max(...validValues) : null;
@@ -1997,28 +2143,31 @@ function render() {
           viewportEndOffset,
         )
       : null;
-    if (drawdownAnalysis) {
+    if (allowAnnotations && drawdownAnalysis) {
       drawdownEligibleCount += 1;
     }
 
-    const lineColor = getColor(city.name, idx);
+    const lineColor = getColor(city.name, colorIndex);
     rendered.push({
       id: city.id,
-      name: city.name,
+      name: displayName,
       color: lineColor,
       normalized,
+      lineType,
+      lineWidthScale,
+      lineOpacity,
       peakMarker:
-        uiState.showDrawdownAnalysis && peakMonth && isFiniteNumber(peakValue)
+        uiState.showDrawdownAnalysis && allowAnnotations && peakMonth && isFiniteNumber(peakValue)
           ? {
               month: peakMonth,
               value: peakValue,
             }
           : null,
-      drawdown: uiState.showDrawdownAnalysis ? drawdownAnalysis : null,
+      drawdown: uiState.showDrawdownAnalysis && allowAnnotations ? drawdownAnalysis : null,
     });
 
     summaryRows.push({
-      name: city.name,
+      name: displayName,
       baseRaw,
       peakValue,
       peakDate: peakMonth,
@@ -2029,7 +2178,46 @@ function render() {
       drawdownFromPeakPct,
       recoverMonth: drawdownAnalysis?.recoverMonth || null,
     });
+    return true;
+  }
+
+  selectedCityIds.forEach((cityId, idx) => {
+    const city = cityById.get(cityId);
+    const series = raw.values[cityId];
+    if (!city || !Array.isArray(series)) return;
+
+    const displayName =
+      compareContext && selectedCityIds.length === 1 && city.name === compareContext.cityName
+        ? `${city.name}（${activeSourceLegend}）`
+        : city.name;
+
+    appendSeries({
+      city,
+      seriesRaw: series.slice(startIndex, endIndex + 1),
+      displayName,
+      colorIndex: idx,
+      lineType: "solid",
+      lineWidthScale: 1,
+      lineOpacity: 1,
+      allowAnnotations: true,
+    });
   });
+
+  if (compareContext) {
+    const compareSeries = compareContext.source?.data?.values?.[compareContext.city.id];
+    if (Array.isArray(compareSeries)) {
+      compareSeriesRendered = appendSeries({
+        city: compareContext.city,
+        seriesRaw: alignSeriesByMonths(compareContext.source.data, compareSeries, months),
+        displayName: `${compareContext.cityName}（${compareSourceLegend}）`,
+        colorIndex: selectedCityIds.length + 1,
+        lineType: "dashed",
+        lineWidthScale: 0.94,
+        lineOpacity: 0.96,
+        allowAnnotations: false,
+      });
+    }
+  }
 
   if (rendered.length === 0) {
     chart.clear();
@@ -2077,7 +2265,11 @@ function render() {
   chart.dispatchAction({ type: "updateAxisPointer", currTrigger: "leave" });
   chartTitleEl.textContent = `热点城市二手房价格走势图`;
   const sourceLabelShort = activeSourceMeta?.label || "中原领先指数（6城）";
-  chartMetaEl.textContent = `${formatMonthZh(viewportStartMonth)} - ${formatMonthZh(viewportEndMonth)} | 定基 ${formatMonthZh(viewportStartMonth)} = 100 | ${sourceLabelShort}`;
+  const compareMetaText =
+    compareContext && compareSeriesRendered
+      ? ` | 对比 ${compareContext.cityName}（${activeSourceLegend} vs ${compareSourceLegend}）`
+      : "";
+  chartMetaEl.textContent = `${formatMonthZh(viewportStartMonth)} - ${formatMonthZh(viewportEndMonth)} | 定基 ${formatMonthZh(viewportStartMonth)} = 100 | ${sourceLabelShort}${compareMetaText}`;
 
   renderSummaryTable(visibleSummaryRows);
   renderChartStatsOverlay(visibleSummaryRows, viewportStartMonth, viewportEndMonth);
@@ -2092,12 +2284,20 @@ function render() {
   const analysisText = uiState.showDrawdownAnalysis
     ? "已显示累计跌幅与跌回示意。"
     : "";
+  const compareText =
+    compareContext && compareSeriesRendered
+      ? `已开启 ${compareContext.cityName} 跨源对比（${activeSourceLegend} vs ${compareSourceLegend}）。`
+      : "";
   const sourceLabel = activeSourceMeta?.sourceTitle || "中原领先指数（月度）";
-  footnoteEl.textContent = `数据源：${sourceLabel}。${modeText}当前滑块区间：${viewportStartMonth} ~ ${viewportEndMonth}。${analysisText}${missingText}${noDataText}`;
+  footnoteEl.textContent = `数据源：${sourceLabel}。${modeText}${compareText}当前滑块区间：${viewportStartMonth} ~ ${viewportEndMonth}。${analysisText}${missingText}${noDataText}`;
 
+  const compareStatusText =
+    compareContext && compareSeriesRendered
+      ? `，并已对比 ${compareContext.cityName}（${activeSourceLegend} vs ${compareSourceLegend}）`
+      : "";
   const statusMessage = wasAutoAdjusted
-    ? `你选择的区间超出有效数据范围，已自动调整为 ${startMonth} ~ ${endMonth}；当前滑块区间 ${viewportStartMonth} ~ ${viewportEndMonth}（定基 ${viewportStartMonth}=100）。`
-    : `已生成 ${rendered.length} 个城市走势（当前滑块区间 ${viewportStartMonth} ~ ${viewportEndMonth}，定基 ${viewportStartMonth}=100）。`;
+    ? `你选择的区间超出有效数据范围，已自动调整为 ${startMonth} ~ ${endMonth}；当前滑块区间 ${viewportStartMonth} ~ ${viewportEndMonth}（定基 ${viewportStartMonth}=100）${compareStatusText}。`
+    : `已生成 ${rendered.length} 条走势（当前滑块区间 ${viewportStartMonth} ~ ${viewportEndMonth}，定基 ${viewportStartMonth}=100）${compareStatusText}。`;
   setStatus(statusMessage, false);
 }
 
@@ -2109,6 +2309,13 @@ function bindEvents() {
         setStatus("数据源切换失败，请刷新重试。", true);
         return;
       }
+      render();
+    });
+  }
+
+  if (compareSourceEl) {
+    compareSourceEl.addEventListener("change", () => {
+      refreshCompareSourceControl({ keepSelection: true });
       render();
     });
   }
@@ -2198,16 +2405,36 @@ function bindEvents() {
     }, 90);
   });
 
+  cityListEl.addEventListener("change", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement) || target.type !== "checkbox") return;
+
+    const passed = enforceCitySelectionLimit(target);
+    refreshCompareSourceControl({ keepSelection: true });
+    if (!passed) {
+      setStatus(`一次最多选择 ${MAX_SELECTED_CITY_COUNT} 个城市。`, true);
+    }
+  });
+
   selectAllBtn.addEventListener("click", () => {
+    let selectedCount = 0;
     cityListEl.querySelectorAll('input[type="checkbox"]').forEach((el) => {
-      el.checked = true;
+      if (selectedCount < MAX_SELECTED_CITY_COUNT) {
+        el.checked = true;
+        selectedCount += 1;
+      } else {
+        el.checked = false;
+      }
     });
+    refreshCompareSourceControl({ keepSelection: true });
+    setStatus(`已选择前 ${MAX_SELECTED_CITY_COUNT} 个城市。`, false);
   });
 
   clearAllBtn.addEventListener("click", () => {
     cityListEl.querySelectorAll('input[type="checkbox"]').forEach((el) => {
       el.checked = false;
     });
+    refreshCompareSourceControl({ keepSelection: false });
   });
 
   startMonthEl.addEventListener("change", () => {
