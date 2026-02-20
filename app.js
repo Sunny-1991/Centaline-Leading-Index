@@ -1927,13 +1927,41 @@ function makeOption(
         },
         endLabel: {
           show: true,
-          formatter: "{a}",
+          formatter() {
+            const mainText = item.endLabelMain || item.name;
+            const subText = item.endLabelSub || "";
+            if (subText) {
+              return `{main|${mainText}}\n{sub|${subText}}`;
+            }
+            return `{main|${mainText}}`;
+          },
           color: item.color,
-          fontWeight: 700,
           fontFamily: CHART_FONT_FAMILY,
           fontSize: endLabelFontSize,
           backgroundColor: CHART_TEXT_MASK_COLOR,
-          padding: [1, 5],
+          padding: item.endLabelSub ? [2, 5] : [1, 5],
+          rich: {
+            main: {
+              color: item.color,
+              fontFamily: CHART_FONT_FAMILY,
+              fontWeight: 700,
+              fontSize: Math.max(10, Math.round(endLabelFontSize * (item.endLabelMainScale || 1))),
+              lineHeight: Math.max(
+                13,
+                Math.round(endLabelFontSize * (item.endLabelMainScale || 1) * 1.08),
+              ),
+            },
+            sub: {
+              color: item.color,
+              fontFamily: CHART_FONT_FAMILY,
+              fontWeight: 600,
+              fontSize: Math.max(8, Math.round(endLabelFontSize * (item.endLabelSubScale || 0.82))),
+              lineHeight: Math.max(
+                10,
+                Math.round(endLabelFontSize * (item.endLabelSubScale || 0.82) * 1.05),
+              ),
+            },
+          },
         },
         labelLayout: {
           moveOverlap: "shiftY",
@@ -2096,6 +2124,10 @@ function render() {
     city,
     seriesRaw,
     displayName,
+    endLabelMain = displayName,
+    endLabelSub = "",
+    endLabelMainScale = 1,
+    endLabelSubScale = 0.82,
     colorIndex,
     lineType = "solid",
     lineWidthScale = 1,
@@ -2151,6 +2183,10 @@ function render() {
     rendered.push({
       id: city.id,
       name: displayName,
+      endLabelMain,
+      endLabelSub,
+      endLabelMainScale,
+      endLabelSubScale,
       color: lineColor,
       normalized,
       lineType,
@@ -2195,6 +2231,22 @@ function render() {
       city,
       seriesRaw: series.slice(startIndex, endIndex + 1),
       displayName,
+      endLabelMain:
+        compareContext && selectedCityIds.length === 1 && city.name === compareContext.cityName
+          ? city.name
+          : displayName,
+      endLabelSub:
+        compareContext && selectedCityIds.length === 1 && city.name === compareContext.cityName
+          ? `（${activeSourceLegend}）`
+          : "",
+      endLabelMainScale:
+        compareContext && selectedCityIds.length === 1 && city.name === compareContext.cityName
+          ? 0.92
+          : 1,
+      endLabelSubScale:
+        compareContext && selectedCityIds.length === 1 && city.name === compareContext.cityName
+          ? 0.72
+          : 0.82,
       colorIndex: idx,
       lineType: "solid",
       lineWidthScale: 1,
@@ -2210,6 +2262,10 @@ function render() {
         city: compareContext.city,
         seriesRaw: alignSeriesByMonths(compareContext.source.data, compareSeries, months),
         displayName: `${compareContext.cityName}（${compareSourceLegend}）`,
+        endLabelMain: compareContext.cityName,
+        endLabelSub: `（${compareSourceLegend}）`,
+        endLabelMainScale: 0.92,
+        endLabelSubScale: 0.72,
         colorIndex: selectedCityIds.length + 1,
         lineType: "dashed",
         lineWidthScale: 0.94,
