@@ -735,43 +735,44 @@ function findRecoverIndex(values, latestValue, historyEndIndex) {
   if (!Number.isInteger(historyEndIndex) || historyEndIndex < 0) return -1;
 
   const safeEndIndex = Math.min(historyEndIndex, values.length - 1);
-  const latestRounded = Number(latestValue.toFixed(1));
-  const exactTolerance = Math.max(Math.abs(latestValue) * 0.0006, 0.03);
+  const exactTolerance = Math.max(Math.abs(latestValue) * 0.00025, 0.01);
+  let firstFiniteIndex = -1;
+  let prevIndex = -1;
+  let prevValue = null;
 
   for (let i = 0; i <= safeEndIndex; i += 1) {
-    const value = values[i];
-    if (!isFiniteNumber(value)) continue;
-    if (Number(value.toFixed(1)) === latestRounded) {
-      return i;
-    }
-  }
-
-  for (let i = 0; i <= safeEndIndex; i += 1) {
-    const value = values[i];
-    if (!isFiniteNumber(value)) continue;
-    if (Math.abs(value - latestValue) <= exactTolerance) {
-      return i;
-    }
-  }
-
-  for (let i = 1; i <= safeEndIndex; i += 1) {
-    const prevValue = values[i - 1];
     const currValue = values[i];
-    if (!isFiniteNumber(prevValue) || !isFiniteNumber(currValue)) continue;
-    const prevDelta = prevValue - latestValue;
-    const currDelta = currValue - latestValue;
-    if (!Number.isFinite(prevDelta) || !Number.isFinite(currDelta)) continue;
-    if (Math.abs(prevDelta) <= exactTolerance) return i - 1;
-    if (Math.abs(currDelta) <= exactTolerance) return i;
-    if (prevDelta === 0 || currDelta === 0) continue;
-    if (prevDelta * currDelta < 0) {
-      return i - 1;
+    if (!isFiniteNumber(currValue)) continue;
+
+    if (firstFiniteIndex < 0) {
+      firstFiniteIndex = i;
+      if (currValue >= latestValue || Math.abs(currValue - latestValue) <= exactTolerance) {
+        return i;
+      }
+      prevIndex = i;
+      prevValue = currValue;
+      continue;
     }
+
+    if (Math.abs(currValue - latestValue) <= exactTolerance) {
+      return i;
+    }
+
+    if (isFiniteNumber(prevValue) && prevValue < latestValue && currValue >= latestValue) {
+      const prevDiff = Math.abs(prevValue - latestValue);
+      const currDiff = Math.abs(currValue - latestValue);
+      return prevDiff <= currDiff ? prevIndex : i;
+    }
+
+    prevIndex = i;
+    prevValue = currValue;
   }
+
+  if (firstFiniteIndex < 0) return -1;
 
   let nearestIndex = -1;
   let nearestDiff = Number.POSITIVE_INFINITY;
-  for (let i = 0; i <= safeEndIndex; i += 1) {
+  for (let i = firstFiniteIndex; i <= safeEndIndex; i += 1) {
     const value = values[i];
     if (!isFiniteNumber(value)) continue;
     const diff = Math.abs(value - latestValue);
@@ -896,8 +897,161 @@ function buildDrawdownHorizontalLayout(
     startIndex,
     endIndex,
     labelCenterIndex,
+    halfGapMonths: halfGap,
     leftBreakIndex,
     rightBreakIndex,
+  };
+}
+
+function resolveHorizontalBreaksForLabel(startIndex, endIndex, labelCenterIndex, halfGapMonths) {
+  let leftBreakIndex = Math.max(startIndex, labelCenterIndex - halfGapMonths);
+  let rightBreakIndex = Math.min(endIndex, labelCenterIndex + halfGapMonths);
+  if (leftBreakIndex >= rightBreakIndex) {
+    leftBreakIndex = Math.max(startIndex, labelCenterIndex - 1);
+    rightBreakIndex = Math.min(endIndex, labelCenterIndex + 1);
+  }
+
+  const span = endIndex - startIndex;
+  if (leftBreakIndex <= startIndex && span >= 3) {
+    leftBreakIndex = startIndex + 1;
+  }
+  if (rightBreakIndex >= endIndex && span >= 3) {
+    rightBreakIndex = endIndex - 1;
+  }
+
+  return {
+    leftBreakIndex,
+    rightBreakIndex,
+  };
+}
+
+function resolveRecoverLabelLayoutAvoidPeak(
+  horizontalLayout,
+  drawdown,
+  months,
+  toPixelCoord,
+  peakLabelRects,
+  chartBounds,
+  recoverLabelBox,
+) {
+  if (
+    !horizontalLayout ||
+    !drawdown ||
+    !Array.isArray(months) ||
+    months.length === 0 ||
+    typeof toPixelCoord !== "function" ||
+    !Array.isArray(peakLabelRects) ||
+    !recoverLabelBox
+  ) {
+    return horizontalLayout;
+  }
+
+  const { startIndex, endIndex, labelCenterIndex } = horizontalLayout;
+  const halfGapMonths = Math.max(1, Number(horizontalLayout.halfGapMonths) || 1);
+  if (
+    !Number.isInteger(startIndex) ||
+    !Number.isInteger(endIndex) ||
+    !Number.isInteger(labelCenterIndex) ||
+    startIndex >= endIndex
+  ) {
+    return horizontalLayout;
+  }
+
+  const candidateIndices = [labelCenterIndex];
+  const maxDelta = Math.max(labelCenterIndex - startIndex, endIndex - labelCenterIndex);
+  for (let delta = 1; delta <= maxDelta; delta += 1) {
+    const left = labelCenterIndex - delta;
+    const right = labelCenterIndex + delta;
+    if (left >= startIndex) candidateIndices.push(left);
+    if (right <= endIndex) candidateIndices.push(right);
+  }
+  if (Number.isInteger(halfGapMonths) && halfGapMonths > 1) {
+    const leftJump = labelCenterIndex - halfGapMonths;
+    const rightJump = labelCenterIndex + halfGapMonths;
+    if (leftJump >= startIndex) candidateIndices.unshift(leftJump);
+    if (rightJump <= endIndex) candidateIndices.unshift(rightJump);
+  }
+
+  function countPeakConflicts(recoverRect) {
+    if (!recoverRect) return 0;
+    let count = 0;
+    for (const peakRect of peakLabelRects) {
+      if (!peakRect) continue;
+      if (rectsOverlap(recoverRect, peakRect, 10)) {
+        count += 1;
+        continue;
+      }
+
+      const recoverCenterX = recoverRect.x + recoverRect.width / 2;
+      const peakCenterX = peakRect.x + peakRect.width / 2;
+      const dx = Math.abs(recoverCenterX - peakCenterX);
+      const recoverBottom = recoverRect.y + recoverRect.height;
+      const peakBottom = peakRect.y + peakRect.height;
+      const verticalGap = Math.max(
+        peakRect.y - recoverBottom,
+        recoverRect.y - peakBottom,
+        0,
+      );
+
+      const nearX = dx <= Math.max(recoverRect.width, peakRect.width) * 0.5;
+      const nearY = verticalGap <= 14;
+      if (nearX && nearY) {
+        count += 1;
+      }
+    }
+    return count;
+  }
+
+  let bestCandidate = null;
+  for (const candidateIndex of candidateIndices) {
+    const month = months[candidateIndex];
+    if (!month) continue;
+    const anchor = toPixelCoord(month, drawdown.latestValue);
+    if (!anchor) continue;
+
+    const rect = buildLabelRect({
+      anchorX: anchor.x,
+      anchorY: anchor.y,
+      width: recoverLabelBox.width + 8,
+      height: recoverLabelBox.height + 6,
+      position: "inside",
+      offsetX: 0,
+      offsetY: 0,
+    });
+    const overlapCount = countPeakConflicts(rect);
+    const overflow = calcRectOverflow(rect, chartBounds);
+    const distance = Math.abs(candidateIndex - labelCenterIndex);
+    const score = overlapCount * 100000 + overflow * 1200 + distance;
+
+    if (!bestCandidate || score < bestCandidate.score) {
+      bestCandidate = {
+        score,
+        candidateIndex,
+        overlapCount,
+        overflow,
+      };
+    }
+
+    if (overlapCount === 0 && overflow === 0 && distance > 0) {
+      break;
+    }
+  }
+
+  if (!bestCandidate || bestCandidate.candidateIndex === labelCenterIndex) {
+    return horizontalLayout;
+  }
+
+  const breaks = resolveHorizontalBreaksForLabel(
+    startIndex,
+    endIndex,
+    bestCandidate.candidateIndex,
+    halfGapMonths,
+  );
+  return {
+    ...horizontalLayout,
+    labelCenterIndex: bestCandidate.candidateIndex,
+    leftBreakIndex: breaks.leftBreakIndex,
+    rightBreakIndex: breaks.rightBreakIndex,
   };
 }
 
@@ -1959,12 +2113,21 @@ function makeOption(
           ? `跌回 ${drawdown.recoverMonth.replace("-", ".")}`
           : "跌回 -";
         const recoverLabelBox = estimateLabelBox([recoverLabelText], 14, [1, 2], 700);
-        const horizontalLayout = buildDrawdownHorizontalLayout(drawdown, {
+        const rawHorizontalLayout = buildDrawdownHorizontalLayout(drawdown, {
           visibleStartIndex,
           visibleEndIndex,
           plotWidthPx: plotWidth,
           halfGapPx: Math.ceil(recoverLabelBox.width / 2 + 8),
         });
+        const horizontalLayout = resolveRecoverLabelLayoutAvoidPeak(
+          rawHorizontalLayout,
+          drawdown,
+          months,
+          toPixelCoord,
+          peakLabelRects,
+          labelBounds,
+          recoverLabelBox,
+        );
         const hasHorizontalLayout = Boolean(horizontalLayout);
         const recoverDisplayMonth = hasHorizontalLayout
           ? months[horizontalLayout.startIndex] || drawdown.recoverDisplayMonth || drawdown.recoverMonth
