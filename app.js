@@ -1217,7 +1217,7 @@ function renderChartStatsOverlay(rows, startMonth, endMonth) {
   chartStatsOverlayEl.innerHTML = `
     <div class="chart-stats-title-main">二手住宅价格指数：热点城市</div>
     <div class="chart-stats-title-sub">${formatMonthZh(startMonth)} - ${formatMonthZh(endMonth)}</div>
-    <div class="chart-stats-title-sub">定基${formatMonthZh(startMonth)} = 100</div>
+    <div class="chart-stats-title-sub chart-stats-title-base">定基${formatMonthZh(startMonth)} = 100</div>
     <table>
     ${colGroupHtml}
     <thead>
@@ -1386,7 +1386,7 @@ function drawOverlaySummaryOnCanvas(ctx, canvasWidth, canvasHeight, exportContex
   const centerX = tableX + tableW / 2;
   const fontFamily = '"STKaiti","Kaiti SC","KaiTi","BiauKai",serif';
 
-  const mainFontSize = Math.max(16, Math.round(18 * scaleY));
+  const mainFontSize = Math.max(16, Math.round(19 * scaleY));
   const subFontSize = Math.max(12, Math.round(13 * scaleY));
   const cellFontSize = Math.max(12, Math.round(13 * scaleY * OVERLAY_TABLE_SCALE));
   const noteFontSize = Math.max(10, Math.round(12 * scaleY));
@@ -1410,7 +1410,7 @@ function drawOverlaySummaryOnCanvas(ctx, canvasWidth, canvasHeight, exportContex
   );
   cursorY += Math.round(subFontSize * 1.24);
   ctx.fillText(`定基${formatMonthZh(exportContext.startMonth)} = 100`, centerX, cursorY);
-  cursorY += Math.round(subFontSize * 1.78);
+  cursorY += Math.round(subFontSize * 1.2);
 
   const header = [headerLabel, "最高位置", "当前位置", "累计跌幅", "跌回"];
   const colRatios = getOverlayColumnRatios(isCrossSource);
@@ -1885,6 +1885,33 @@ function resolveDrawdownValueLabelOffset(anchorX, anchorY, peakLabelRects, chart
   return best ? [0, best.offsetY] : [0, 0];
 }
 
+function resolveDrawdownVerticalLayout(drawdown, yRange, plotHeight, labelBoxHeightPx, offsetY = 0) {
+  const safePlotHeight = Math.max(1, plotHeight);
+  const safeRange = Math.max(1e-6, yRange);
+  const valuePerPixel = safeRange / safePlotHeight;
+  const drawdownSpan = Math.max(0, drawdown.peakValue - drawdown.latestValue);
+  const verticalMid = (drawdown.peakValue + drawdown.latestValue) / 2;
+
+  const desiredHalfGapPx = Math.max(7, Math.round(labelBoxHeightPx / 2 + 1));
+  let halfGapValue = desiredHalfGapPx * valuePerPixel;
+  const maxHalfGapValue = Math.max(0.05, drawdownSpan / 2 - 0.2);
+  halfGapValue = Math.min(halfGapValue, maxHalfGapValue);
+
+  let labelCenterValue = verticalMid - offsetY * valuePerPixel;
+  const minCenter = drawdown.latestValue + halfGapValue + 0.2;
+  const maxCenter = drawdown.peakValue - halfGapValue - 0.2;
+  if (minCenter <= maxCenter) {
+    labelCenterValue = clampNumber(labelCenterValue, minCenter, maxCenter);
+  } else {
+    labelCenterValue = verticalMid;
+  }
+
+  return {
+    labelCenterValue,
+    halfGapValue,
+  };
+}
+
 function makeOption(
   rendered,
   months,
@@ -1918,8 +1945,6 @@ function makeOption(
   const yMin = allFiniteValues.length > 0 ? Math.min(...allFiniteValues) : 80;
   const yMax = allFiniteValues.length > 0 ? Math.max(...allFiniteValues) : 120;
   const yRange = Math.max(1, yMax - yMin);
-  const usableChartHeight = Math.max(280, chart.getHeight() - 170);
-  const verticalGap = Math.max(14, Math.min(30, (38 * yRange) / usableChartHeight));
   const usableChartWidth = Math.max(420, chart.getWidth() - 190);
   const labelGapMonths = Math.max(
     4,
@@ -2159,9 +2184,9 @@ function makeOption(
       }
 
       if (drawdown) {
+        const drawdownLabelLines = ["累计跌幅", "00.0%"];
+        const drawdownLabelBox = estimateLabelBox(drawdownLabelLines, 14, [2, 4], 700);
         const verticalMid = (drawdown.peakValue + drawdown.latestValue) / 2;
-        const upperSegmentEnd = verticalMid + verticalGap / 2;
-        const lowerSegmentStart = verticalMid - verticalGap / 2;
         const drawdownLabelAnchor = toPixelCoord(drawdown.peakMonth, verticalMid);
         const drawdownLabelOffset = drawdownLabelAnchor
           ? resolveDrawdownValueLabelOffset(
@@ -2171,6 +2196,16 @@ function makeOption(
               labelBounds,
             )
           : [0, 0];
+        const drawdownVerticalLayout = resolveDrawdownVerticalLayout(
+          drawdown,
+          yRange,
+          plotHeight,
+          drawdownLabelBox.height,
+          drawdownLabelOffset[1] || 0,
+        );
+        const labelCenterValue = drawdownVerticalLayout.labelCenterValue;
+        const upperSegmentEnd = labelCenterValue + drawdownVerticalLayout.halfGapValue;
+        const lowerSegmentStart = labelCenterValue - drawdownVerticalLayout.halfGapValue;
 
         markLineData.push([
           {
@@ -2184,7 +2219,7 @@ function makeOption(
         ]);
 
         markPointData.push({
-          coord: [drawdown.peakMonth, verticalMid],
+          coord: [drawdown.peakMonth, labelCenterValue],
           symbol: "circle",
           symbolSize: 2,
           itemStyle: {
@@ -2204,7 +2239,7 @@ function makeOption(
             fontWeight: 700,
             backgroundColor: CHART_TEXT_MASK_COLOR,
             padding: [2, 4],
-            offset: drawdownLabelOffset,
+            offset: [0, 0],
             formatter: `累计跌幅\n${Math.abs(drawdown.drawdownPct).toFixed(1)}%`,
           },
         });
@@ -2239,7 +2274,7 @@ function makeOption(
               drawdown.peakIndex <= horizontalLayout.rightBreakIndex
             )
           : false;
-        const arrowTipClearance = Math.max(1.2, verticalGap * 0.18);
+        const arrowTipClearance = Math.max(1.2, drawdownVerticalLayout.halfGapValue * 0.36);
         let verticalArrowEnd = drawdown.latestValue;
         if (shouldShortVerticalArrow) {
           const shortenedEnd = Math.min(
