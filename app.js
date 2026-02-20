@@ -40,6 +40,7 @@ const chartMetaEl = document.getElementById("chartMeta");
 const footnoteEl = document.getElementById("footnoteText");
 const chartStatsOverlayEl = document.getElementById("chartStatsOverlay");
 const chartEl = document.getElementById("chart");
+const chartStageEl = chartEl ? chartEl.closest(".chart-stage") : null;
 const sourceSubtitleEl = document.getElementById("sourceSubtitleText");
 
 const chart = echarts.init(chartEl, null, {
@@ -1265,6 +1266,32 @@ function downloadByDataURL(dataURL, filename) {
   document.body.removeChild(anchor);
 }
 
+function loadImageByURL(url) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("image-load-failed"));
+    image.src = url;
+  });
+}
+
+async function captureChartStageSnapshot(pixelRatio = 2) {
+  if (!chartStageEl) return null;
+  if (typeof window.html2canvas !== "function") return null;
+
+  const stageRect = chartStageEl.getBoundingClientRect();
+  if (!stageRect.width || !stageRect.height) return null;
+  const stageCanvas = await window.html2canvas(chartStageEl, {
+    backgroundColor: "#ffffff",
+    scale: pixelRatio,
+    useCORS: true,
+    logging: false,
+  });
+  return {
+    dataURL: stageCanvas.toDataURL("image/png"),
+  };
+}
+
 function drawOverlaySummaryOnCanvas(ctx, canvasWidth, canvasHeight, exportContext) {
   if (!uiState.showChartTable || !exportContext) return;
   const rows = Array.isArray(exportContext.visibleSummaryRows)
@@ -1329,7 +1356,7 @@ function drawOverlaySummaryOnCanvas(ctx, canvasWidth, canvasHeight, exportContex
   );
   cursorY += Math.round(subFontSize * 1.24);
   ctx.fillText(`定基${formatMonthZh(exportContext.startMonth)} = 100`, centerX, cursorY);
-  cursorY += Math.round(subFontSize * 1.9);
+  cursorY += Math.round(subFontSize * 1.78);
 
   const header = [headerLabel, "最高位置", "当前位置", "累计跌幅", "跌回"];
   const colRatios = getOverlayColumnRatios(isCrossSource);
@@ -1426,9 +1453,24 @@ function drawOverlaySummaryOnCanvas(ctx, canvasWidth, canvasHeight, exportContex
   );
 }
 
-function exportCurrentChartImage(pixelRatio = 2, label = "标准清晰") {
+async function exportCurrentChartImage(pixelRatio = 2, label = "标准清晰") {
   if (!latestRenderContext) {
     setStatus("暂无可导出的图表，请先生成。", true);
+    return;
+  }
+
+  let stageSnapshot = null;
+  try {
+    stageSnapshot = await captureChartStageSnapshot(pixelRatio);
+  } catch (error) {
+    stageSnapshot = null;
+  }
+
+  if (stageSnapshot?.dataURL) {
+    const suffix = pixelRatio >= 4 ? "-ultra-hd" : "";
+    const filename = `house-price-base100-${latestRenderContext.startMonth}-to-${latestRenderContext.endMonth}${suffix}.png`;
+    downloadByDataURL(stageSnapshot.dataURL, filename);
+    setStatus(`图片已导出（${label}，与当前页面显示一致）。`, false);
     return;
   }
 
@@ -1438,27 +1480,31 @@ function exportCurrentChartImage(pixelRatio = 2, label = "标准清晰") {
     backgroundColor: "#ffffff",
     excludeComponents: ["toolbox", "dataZoom"],
   });
-  const image = new Image();
-  image.onload = () => {
-    const canvas = document.createElement("canvas");
-    canvas.width = image.width;
-    canvas.height = image.height;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) {
-      setStatus("导出失败：无法创建画布。", true);
-      return;
-    }
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(image, 0, 0);
-    drawOverlaySummaryOnCanvas(ctx, canvas.width, canvas.height, latestRenderContext);
-    const suffix = pixelRatio >= 4 ? "-ultra-hd" : "";
-    const filename = `house-price-base100-${latestRenderContext.startMonth}-to-${latestRenderContext.endMonth}${suffix}.png`;
-    downloadByDataURL(canvas.toDataURL("image/png"), filename);
-    setStatus(`图片已导出（${label}，含当前分析与表格设置）。`, false);
-  };
-  image.onerror = () => setStatus("导出失败，请重试。", true);
-  image.src = chartDataUrl;
+  let chartImage;
+  try {
+    chartImage = await loadImageByURL(chartDataUrl);
+  } catch (error) {
+    setStatus("导出失败，请重试。", true);
+    return;
+  }
+
+  const canvas = document.createElement("canvas");
+  canvas.width = chartImage.width;
+  canvas.height = chartImage.height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    setStatus("导出失败：无法创建画布。", true);
+    return;
+  }
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(chartImage, 0, 0);
+  drawOverlaySummaryOnCanvas(ctx, canvas.width, canvas.height, latestRenderContext);
+
+  const suffix = pixelRatio >= 4 ? "-ultra-hd" : "";
+  const filename = `house-price-base100-${latestRenderContext.startMonth}-to-${latestRenderContext.endMonth}${suffix}.png`;
+  downloadByDataURL(canvas.toDataURL("image/png"), filename);
+  setStatus(`图片已导出（${label}，含当前分析与表格设置）。`, false);
 }
 
 function getTextMeasureContext() {
