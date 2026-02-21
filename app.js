@@ -2177,7 +2177,14 @@ function makeOption(
         fontFamily: CHART_FONT_FAMILY,
         formatter(value, index) {
           if (!xAxisLabelLayout.isLabelVisible(value, index)) return "";
-          return xAxisLabelLayout.formatLabel(value);
+          if (Number.isInteger(index) && typeof months[index] === "string" && months[index]) {
+            return xAxisLabelLayout.formatLabel(months[index]);
+          }
+          const fallbackText = String(value || "");
+          if (/^\d{4}$/.test(fallbackText)) {
+            return `${fallbackText}-01`;
+          }
+          return xAxisLabelLayout.formatLabel(fallbackText);
         },
       },
     },
