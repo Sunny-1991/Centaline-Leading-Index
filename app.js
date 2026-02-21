@@ -412,7 +412,18 @@ function resolveXAxisLabelLayout(months, chartWidth, visibleStartIndex, visibleE
     margin = 13;
   } else if (chartWidth <= 1120) {
     maxLabels = 12;
+    preferredMonths = new Set(["01", "07"]);
+  }
+
+  const visibleSpanMonths = safeEnd - safeStart + 1;
+  if (visibleSpanMonths > 144) {
     preferredMonths = new Set(["01"]);
+  } else if (visibleSpanMonths > 72) {
+    preferredMonths = new Set(["01", "07"]);
+  } else if (visibleSpanMonths > 36) {
+    preferredMonths = new Set(["01", "04", "07", "10"]);
+  } else {
+    preferredMonths = new Set(["01", "03", "05", "07", "09", "11"]);
   }
 
   const candidateIndexes = [];
@@ -438,10 +449,53 @@ function resolveXAxisLabelLayout(months, chartWidth, visibleStartIndex, visibleE
     }
   });
 
-  visibleIndexes.add(safeStart);
-  visibleIndexes.add(safeEnd);
+  const minEdgeGapMonths = Math.max(2, Math.round(visibleSpanMonths / Math.max(12, maxLabels * 1.6)));
+  const hasNearbyLabel = (targetIndex) => {
+    for (const index of visibleIndexes) {
+      if (Math.abs(index - targetIndex) <= minEdgeGapMonths) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  if (!hasNearbyLabel(safeStart)) {
+    visibleIndexes.add(safeStart);
+  }
+  if (!hasNearbyLabel(safeEnd)) {
+    visibleIndexes.add(safeEnd);
+  }
+
+  let normalizedIndexes = Array.from(visibleIndexes)
+    .filter((index) => Number.isInteger(index))
+    .sort((a, b) => a - b);
+
+  if (normalizedIndexes.length > maxLabels) {
+    const edgeSet = new Set([normalizedIndexes[0], normalizedIndexes[normalizedIndexes.length - 1]]);
+    const middleSlots = Math.max(0, maxLabels - edgeSet.size);
+    if (middleSlots > 0) {
+      for (let i = 1; i <= middleSlots; i += 1) {
+        const rawPos = Math.round((i * (normalizedIndexes.length - 1)) / (middleSlots + 1));
+        const sampleIndex = normalizedIndexes[rawPos];
+        if (Number.isInteger(sampleIndex)) {
+          edgeSet.add(sampleIndex);
+        }
+      }
+    }
+    normalizedIndexes = Array.from(edgeSet).sort((a, b) => a - b);
+  }
+
+  const finalVisibleIndexes = new Set(normalizedIndexes);
+  if (chartWidth > 760) {
+    if (normalizedIndexes.length <= 8) {
+      rotate = 0;
+    } else if (normalizedIndexes.length <= 11) {
+      rotate = 24;
+    }
+  }
+
   const visibleValues = new Set();
-  visibleIndexes.forEach((index) => {
+  finalVisibleIndexes.forEach((index) => {
     const value = months[index];
     if (typeof value === "string" && value) {
       visibleValues.add(value);
@@ -453,7 +507,7 @@ function resolveXAxisLabelLayout(months, chartWidth, visibleStartIndex, visibleE
     rotate,
     fontSize,
     isLabelVisible(value, index) {
-      if (Number.isInteger(index) && visibleIndexes.has(index)) {
+      if (Number.isInteger(index) && finalVisibleIndexes.has(index)) {
         return true;
       }
       return visibleValues.has(String(value || ""));
