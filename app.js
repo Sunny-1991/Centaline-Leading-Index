@@ -393,27 +393,24 @@ function resolveXAxisLabelLayout(months, chartWidth, visibleStartIndex, visibleE
   );
   const span = Math.max(0, safeEnd - safeStart);
 
-  let maxLabels = 18;
-  let rotate = 42;
-  let fontSize = 12.0;
+  let maxLabels = 14;
+  let fontSize = 11.8;
   let margin = 14;
 
   if (chartWidth <= 520) {
-    maxLabels = 6;
-    rotate = 34;
-    fontSize = 10.3;
+    maxLabels = 5;
+    fontSize = 10.1;
     margin = 12;
   } else if (chartWidth <= 760) {
-    maxLabels = 8;
-    rotate = 38;
-    fontSize = 10.9;
+    maxLabels = 7;
+    fontSize = 10.8;
     margin = 13;
   } else if (chartWidth <= 1120) {
-    maxLabels = 12;
+    maxLabels = 10;
   }
 
   const plotWidth = Math.max(220, chartWidth - CHART_GRID_LAYOUT.left - CHART_GRID_LAYOUT.right);
-  const minGapPx = chartWidth <= 520 ? 70 : chartWidth <= 760 ? 82 : 92;
+  const minGapPx = chartWidth <= 520 ? 78 : chartWidth <= 760 ? 90 : 108;
   const maxByGap = Math.max(2, Math.floor(plotWidth / minGapPx) + 1);
   const targetLabelCount = Math.max(2, Math.min(maxLabels, maxByGap, span + 1));
 
@@ -437,36 +434,32 @@ function resolveXAxisLabelLayout(months, chartWidth, visibleStartIndex, visibleE
   if (normalizedIndexes.length > 1 && span > 0) {
     const pxPerMonth = plotWidth / span;
     const minGapMonths = Math.max(1, Math.ceil(minGapPx / Math.max(pxPerMonth, 0.0001)));
-    const filtered = [normalizedIndexes[0]];
-    for (let i = 1; i < normalizedIndexes.length - 1; i += 1) {
-      const current = normalizedIndexes[i];
+    const filtered = [];
+    for (const index of normalizedIndexes) {
+      if (filtered.length === 0) {
+        filtered.push(index);
+        continue;
+      }
       const prev = filtered[filtered.length - 1];
-      if (current - prev >= minGapMonths) {
-        filtered.push(current);
+      if (index - prev >= minGapMonths) {
+        filtered.push(index);
       }
     }
-    filtered.push(normalizedIndexes[normalizedIndexes.length - 1]);
+    if (filtered.length === 1 && safeEnd !== safeStart) {
+      filtered.push(safeEnd);
+    } else if (filtered.length > 1 && filtered[filtered.length - 1] !== safeEnd) {
+      const last = filtered[filtered.length - 1];
+      if (safeEnd - last < minGapMonths && filtered.length >= 2) {
+        filtered[filtered.length - 1] = safeEnd;
+      } else {
+        filtered.push(safeEnd);
+      }
+    }
     normalizedIndexes = Array.from(new Set(filtered)).sort((a, b) => a - b);
   }
 
   const finalVisibleIndexes = new Set(normalizedIndexes);
   const showYearOnly = span >= 96;
-
-  if (chartWidth <= 520) {
-    rotate = normalizedIndexes.length <= 5 ? 24 : 32;
-  } else if (chartWidth <= 760) {
-    rotate = normalizedIndexes.length <= 6 ? 26 : 34;
-  } else if (normalizedIndexes.length <= 8) {
-    rotate = 0;
-  } else if (normalizedIndexes.length <= 11) {
-    rotate = 22;
-  } else {
-    rotate = 36;
-  }
-
-  if (showYearOnly) {
-    rotate = Math.max(0, rotate - 10);
-  }
 
   const visibleValues = new Set();
   finalVisibleIndexes.forEach((index) => {
@@ -478,7 +471,7 @@ function resolveXAxisLabelLayout(months, chartWidth, visibleStartIndex, visibleE
 
   return {
     margin,
-    rotate,
+    rotate: 0,
     fontSize,
     formatLabel(value) {
       const text = String(value || "");
@@ -2182,7 +2175,7 @@ function makeOption(
         rotate: xAxisLabelLayout.rotate,
         fontSize: xAxisLabelLayout.fontSize,
         fontWeight: 800,
-        hideOverlap: false,
+        hideOverlap: true,
         showMinLabel: true,
         showMaxLabel: true,
         fontFamily: CHART_FONT_FAMILY,
