@@ -493,15 +493,19 @@ function resolveXAxisLabelLayout(months, chartWidth, visibleStartIndex, visibleE
     rotate: 0,
     fontSize,
     formatLabel(value) {
-      const text = String(value || "");
+      const text = normalizeMonthToken(value);
       if (!text) return "";
       return text;
     },
     isLabelVisible(value, index) {
-      if (Number.isInteger(index) && finalVisibleIndexes.has(index)) {
+      const normalizedValue = normalizeMonthToken(value);
+      if (normalizedValue && visibleValues.has(normalizedValue)) {
         return true;
       }
-      return visibleValues.has(String(value || ""));
+      if (!normalizedValue && Number.isInteger(index) && finalVisibleIndexes.has(index)) {
+        return true;
+      }
+      return false;
     },
   };
 }
@@ -2240,15 +2244,9 @@ function makeOption(
         showMaxLabel: true,
         fontFamily: CHART_FONT_FAMILY,
         formatter(value, index) {
-          if (!xAxisLabelLayout.isLabelVisible(value, index)) return "";
-          if (Number.isInteger(index) && typeof axisMonths[index] === "string" && axisMonths[index]) {
-            return xAxisLabelLayout.formatLabel(axisMonths[index]);
-          }
           const normalizedValue = normalizeMonthToken(value);
-          if (normalizedValue) {
-            return xAxisLabelLayout.formatLabel(normalizedValue);
-          }
-          return xAxisLabelLayout.formatLabel(value);
+          if (!xAxisLabelLayout.isLabelVisible(normalizedValue || value, index)) return "";
+          return xAxisLabelLayout.formatLabel(normalizedValue || value);
         },
       },
     },
