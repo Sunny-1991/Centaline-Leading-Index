@@ -2109,6 +2109,10 @@ function makeOption(
     },
     tooltip: {
       trigger: "axis",
+      axisPointer: {
+        type: "line",
+        snap: true,
+      },
       textStyle: {
         fontFamily: CHART_FONT_FAMILY,
       },
@@ -2210,9 +2214,11 @@ function makeOption(
     ],
     xAxis: {
       type: "category",
+      boundaryGap: false,
       data: axisMonths,
       axisTick: {
         show: chartWidth > 760,
+        alignWithLabel: true,
         interval: 0,
         length: chartWidth <= 520 ? 4 : 5,
       },
