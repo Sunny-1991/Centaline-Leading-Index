@@ -339,6 +339,19 @@ function clampNumber(value, min, max) {
   return Math.min(Math.max(value, min), max);
 }
 
+function toFiniteNumber(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function resolveAxisMonthFromPercent(percent, axisData) {
+  if (!Array.isArray(axisData) || axisData.length === 0) return null;
+  const normalizedPercent = toFiniteNumber(percent);
+  if (normalizedPercent === null) return null;
+  const index = Math.round((clampNumber(normalizedPercent, 0, 100) / 100) * (axisData.length - 1));
+  return axisData[index] ?? null;
+}
+
 function resolveAxisMonthFromZoomValue(value, percent, axisData) {
   if (!Array.isArray(axisData) || axisData.length === 0) return null;
 
@@ -356,12 +369,7 @@ function resolveAxisMonthFromZoomValue(value, percent, axisData) {
     return axisData[index] ?? null;
   }
 
-  if (Number.isFinite(percent)) {
-    const index = Math.round((clampNumber(Number(percent), 0, 100) / 100) * (axisData.length - 1));
-    return axisData[index] ?? null;
-  }
-
-  return null;
+  return resolveAxisMonthFromPercent(percent, axisData);
 }
 
 function getZoomPayload(event) {
@@ -2048,8 +2056,6 @@ function makeOption(
 
   const zoomStartToken = typeof zoomStartMonth === "string" ? normalizeMonthToken(zoomStartMonth) : undefined;
   const zoomEndToken = typeof zoomEndMonth === "string" ? normalizeMonthToken(zoomEndMonth) : undefined;
-  const zoomStartValue = typeof zoomStartToken === "string" ? toAxisMonth(zoomStartToken) : undefined;
-  const zoomEndValue = typeof zoomEndToken === "string" ? toAxisMonth(zoomEndToken) : undefined;
   let visibleStartIndex = 0;
   let visibleEndIndex = Math.max(0, months.length - 1);
   if (typeof zoomStartToken === "string") {
@@ -2065,6 +2071,9 @@ function makeOption(
     visibleStartIndex = visibleEndIndex;
     visibleEndIndex = temp;
   }
+  const axisMaxIndex = Math.max(1, axisMonths.length - 1);
+  const zoomStartPercent = (visibleStartIndex / axisMaxIndex) * 100;
+  const zoomEndPercent = (visibleEndIndex / axisMaxIndex) * 100;
   const selectedMap = Object.fromEntries(
     rendered.map((item) => [item.name, !hiddenCityNames.has(item.name)]),
   );
@@ -2213,8 +2222,8 @@ function makeOption(
         type: "slider",
         xAxisIndex: 0,
         filterMode: "none",
-        startValue: zoomStartValue,
-        endValue: zoomEndValue,
+        start: zoomStartPercent,
+        end: zoomEndPercent,
         showDetail: false,
         brushSelect: false,
         bottom: 46,
@@ -3295,23 +3304,17 @@ function bindEvents() {
       const endValue = typeof zoomPayload?.endValue !== "undefined"
         ? zoomPayload.endValue
         : sliderZoom.endValue;
-      const startPercent = Number.isFinite(zoomPayload?.start)
-        ? Number(zoomPayload.start)
-        : sliderZoom.start;
-      const endPercent = Number.isFinite(zoomPayload?.end)
-        ? Number(zoomPayload.end)
-        : sliderZoom.end;
+      const startPercent = toFiniteNumber(zoomPayload?.start) ?? toFiniteNumber(sliderZoom.start);
+      const endPercent = toFiniteNumber(zoomPayload?.end) ?? toFiniteNumber(sliderZoom.end);
 
-      const nextStartMonth = resolveAxisMonthFromZoomValue(
-        startValue,
-        startPercent,
-        axisData,
-      );
-      const nextEndMonth = resolveAxisMonthFromZoomValue(
-        endValue,
-        endPercent,
-        axisData,
-      );
+      const nextStartMonth =
+        resolveAxisMonthFromPercent(startPercent, axisData) ||
+        resolveAxisMonthFromZoomValue(startValue, startPercent, axisData) ||
+        uiState.zoomStartMonth;
+      const nextEndMonth =
+        resolveAxisMonthFromPercent(endPercent, axisData) ||
+        resolveAxisMonthFromZoomValue(endValue, endPercent, axisData) ||
+        uiState.zoomEndMonth;
       const normalizedStartMonth = normalizeMonthToken(nextStartMonth);
       const normalizedEndMonth = normalizeMonthToken(nextEndMonth);
       if (!normalizedStartMonth || !normalizedEndMonth || normalizedStartMonth > normalizedEndMonth) {
