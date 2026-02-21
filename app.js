@@ -391,107 +391,81 @@ function resolveXAxisLabelLayout(months, chartWidth, visibleStartIndex, visibleE
     safeStart,
     Math.max(0, months.length - 1),
   );
+  const span = Math.max(0, safeEnd - safeStart);
 
   let maxLabels = 18;
-  let preferredMonths = new Set(["01", "07"]);
   let rotate = 42;
   let fontSize = 12.0;
   let margin = 14;
 
   if (chartWidth <= 520) {
     maxLabels = 6;
-    preferredMonths = new Set(["01"]);
     rotate = 34;
     fontSize = 10.3;
     margin = 12;
   } else if (chartWidth <= 760) {
     maxLabels = 8;
-    preferredMonths = new Set(["01"]);
     rotate = 38;
     fontSize = 10.9;
     margin = 13;
   } else if (chartWidth <= 1120) {
     maxLabels = 12;
-    preferredMonths = new Set(["01", "07"]);
   }
 
-  const visibleSpanMonths = safeEnd - safeStart + 1;
-  if (visibleSpanMonths > 144) {
-    preferredMonths = new Set(["01"]);
-  } else if (visibleSpanMonths > 72) {
-    preferredMonths = new Set(["01", "07"]);
-  } else if (visibleSpanMonths > 36) {
-    preferredMonths = new Set(["01", "04", "07", "10"]);
+  const plotWidth = Math.max(220, chartWidth - CHART_GRID_LAYOUT.left - CHART_GRID_LAYOUT.right);
+  const minGapPx = chartWidth <= 520 ? 70 : chartWidth <= 760 ? 82 : 92;
+  const maxByGap = Math.max(2, Math.floor(plotWidth / minGapPx) + 1);
+  const targetLabelCount = Math.max(2, Math.min(maxLabels, maxByGap, span + 1));
+
+  const sampledIndexes = new Set();
+  if (span === 0) {
+    sampledIndexes.add(safeStart);
   } else {
-    preferredMonths = new Set(["01", "03", "05", "07", "09", "11"]);
-  }
-
-  const candidateIndexes = [];
-  for (let index = safeStart; index <= safeEnd; index += 1) {
-    const month = String(months[index] || "").slice(5, 7);
-    if (preferredMonths.has(month)) {
-      candidateIndexes.push(index);
+    for (let i = 0; i < targetLabelCount; i += 1) {
+      const ratio = targetLabelCount === 1 ? 0 : i / (targetLabelCount - 1);
+      const index = Math.round(safeStart + span * ratio);
+      sampledIndexes.add(clampNumber(index, safeStart, safeEnd));
     }
+    sampledIndexes.add(safeStart);
+    sampledIndexes.add(safeEnd);
   }
 
-  if (candidateIndexes.length === 0) {
-    candidateIndexes.push(safeStart);
-    if (safeEnd !== safeStart) {
-      candidateIndexes.push(safeEnd);
-    }
-  }
-
-  const stride = Math.max(1, Math.ceil(candidateIndexes.length / maxLabels));
-  const visibleIndexes = new Set();
-  candidateIndexes.forEach((index, order) => {
-    if (order % stride === 0) {
-      visibleIndexes.add(index);
-    }
-  });
-
-  const minEdgeGapMonths = Math.max(2, Math.round(visibleSpanMonths / Math.max(12, maxLabels * 1.6)));
-  const hasNearbyLabel = (targetIndex) => {
-    for (const index of visibleIndexes) {
-      if (Math.abs(index - targetIndex) <= minEdgeGapMonths) {
-        return true;
-      }
-    }
-    return false;
-  };
-
-  if (!hasNearbyLabel(safeStart)) {
-    visibleIndexes.add(safeStart);
-  }
-  if (!hasNearbyLabel(safeEnd)) {
-    visibleIndexes.add(safeEnd);
-  }
-
-  let normalizedIndexes = Array.from(visibleIndexes)
+  let normalizedIndexes = Array.from(sampledIndexes)
     .filter((index) => Number.isInteger(index))
     .sort((a, b) => a - b);
 
-  if (normalizedIndexes.length > maxLabels) {
-    const edgeSet = new Set([normalizedIndexes[0], normalizedIndexes[normalizedIndexes.length - 1]]);
-    const middleSlots = Math.max(0, maxLabels - edgeSet.size);
-    if (middleSlots > 0) {
-      for (let i = 1; i <= middleSlots; i += 1) {
-        const rawPos = Math.round((i * (normalizedIndexes.length - 1)) / (middleSlots + 1));
-        const sampleIndex = normalizedIndexes[rawPos];
-        if (Number.isInteger(sampleIndex)) {
-          edgeSet.add(sampleIndex);
-        }
+  if (normalizedIndexes.length > 1 && span > 0) {
+    const pxPerMonth = plotWidth / span;
+    const minGapMonths = Math.max(1, Math.ceil(minGapPx / Math.max(pxPerMonth, 0.0001)));
+    const filtered = [normalizedIndexes[0]];
+    for (let i = 1; i < normalizedIndexes.length - 1; i += 1) {
+      const current = normalizedIndexes[i];
+      const prev = filtered[filtered.length - 1];
+      if (current - prev >= minGapMonths) {
+        filtered.push(current);
       }
     }
-    normalizedIndexes = Array.from(edgeSet).sort((a, b) => a - b);
+    filtered.push(normalizedIndexes[normalizedIndexes.length - 1]);
+    normalizedIndexes = Array.from(new Set(filtered)).sort((a, b) => a - b);
   }
 
   const finalVisibleIndexes = new Set(normalizedIndexes);
-  if (chartWidth > 760) {
-    if (normalizedIndexes.length <= 8) {
-      rotate = 0;
-    } else if (normalizedIndexes.length <= 11) {
-      rotate = 24;
-    }
+  const showYearOnly = span >= 96;
+
+  if (chartWidth <= 520) {
+    rotate = normalizedIndexes.length <= 5 ? 24 : 32;
+  } else if (chartWidth <= 760) {
+    rotate = normalizedIndexes.length <= 6 ? 26 : 34;
+  } else if (normalizedIndexes.length <= 8) {
+    rotate = 0;
+  } else if (normalizedIndexes.length <= 11) {
+    rotate = 22;
+  } else {
+    rotate = 36;
+  }
+
+  if (showYearOnly) {
+    rotate = Math.max(0, rotate - 10);
   }
 
   const visibleValues = new Set();
@@ -506,6 +480,14 @@ function resolveXAxisLabelLayout(months, chartWidth, visibleStartIndex, visibleE
     margin,
     rotate,
     fontSize,
+    formatLabel(value) {
+      const text = String(value || "");
+      if (!text) return "";
+      if (showYearOnly && text.length >= 4) {
+        return text.slice(0, 4);
+      }
+      return text;
+    },
     isLabelVisible(value, index) {
       if (Number.isInteger(index) && finalVisibleIndexes.has(index)) {
         return true;
@@ -2205,7 +2187,8 @@ function makeOption(
         showMaxLabel: true,
         fontFamily: CHART_FONT_FAMILY,
         formatter(value, index) {
-          return xAxisLabelLayout.isLabelVisible(value, index) ? value : "";
+          if (!xAxisLabelLayout.isLabelVisible(value, index)) return "";
+          return xAxisLabelLayout.formatLabel(value);
         },
       },
     },
