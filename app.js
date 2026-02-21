@@ -530,7 +530,7 @@ function resolveXAxisLabelLayout(months, chartWidth, visibleStartIndex, visibleE
     formatLabel(value) {
       const text = normalizeMonthToken(value);
       if (!text) return "";
-      return formatMonthDot(text);
+      return text;
     },
     isLabelVisible(value, index) {
       const normalizedValue = normalizeMonthToken(value);
