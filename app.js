@@ -143,6 +143,21 @@ function formatMonthZh(month) {
   return `${year}年${Number(m)}月`;
 }
 
+function normalizeMonthToken(value) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  if (/^\d{4}$/.test(text)) {
+    return `${text}-01`;
+  }
+  const matched = text.match(/^(\d{4})[-/.](\d{1,2})$/);
+  if (matched) {
+    const year = matched[1];
+    const month = String(Number(matched[2])).padStart(2, "0");
+    return `${year}-${month}`;
+  }
+  return text;
+}
+
 function setStatus(text, isError = false) {
   statusEl.textContent = text;
   statusEl.classList.toggle("error", isError);
@@ -1971,16 +1986,42 @@ function makeOption(
   zoomStartMonth,
   zoomEndMonth,
 ) {
-  const zoomStartValue = typeof zoomStartMonth === "string" ? zoomStartMonth : undefined;
-  const zoomEndValue = typeof zoomEndMonth === "string" ? zoomEndMonth : undefined;
+  const axisMonths = months.map((month) => normalizeMonthToken(month));
+  const monthToAxisMap = new Map();
+  axisMonths.forEach((axisMonth, index) => {
+    const rawMonth = String(months[index] || "").trim();
+    if (rawMonth && axisMonth) {
+      monthToAxisMap.set(rawMonth, axisMonth);
+    }
+    if (axisMonth) {
+      monthToAxisMap.set(axisMonth, axisMonth);
+    }
+  });
+  const toAxisMonth = (month) => {
+    const rawText = String(month || "").trim();
+    if (!rawText) return "";
+    if (monthToAxisMap.has(rawText)) {
+      return monthToAxisMap.get(rawText);
+    }
+    const normalized = normalizeMonthToken(rawText);
+    if (monthToAxisMap.has(normalized)) {
+      return monthToAxisMap.get(normalized);
+    }
+    return normalized || rawText;
+  };
+
+  const zoomStartToken = typeof zoomStartMonth === "string" ? normalizeMonthToken(zoomStartMonth) : undefined;
+  const zoomEndToken = typeof zoomEndMonth === "string" ? normalizeMonthToken(zoomEndMonth) : undefined;
+  const zoomStartValue = typeof zoomStartToken === "string" ? toAxisMonth(zoomStartToken) : undefined;
+  const zoomEndValue = typeof zoomEndToken === "string" ? toAxisMonth(zoomEndToken) : undefined;
   let visibleStartIndex = 0;
   let visibleEndIndex = Math.max(0, months.length - 1);
-  if (typeof zoomStartValue === "string") {
-    const idx = months.indexOf(zoomStartValue);
+  if (typeof zoomStartToken === "string") {
+    const idx = axisMonths.indexOf(zoomStartToken);
     if (idx >= 0) visibleStartIndex = idx;
   }
-  if (typeof zoomEndValue === "string") {
-    const idx = months.indexOf(zoomEndValue);
+  if (typeof zoomEndToken === "string") {
+    const idx = axisMonths.indexOf(zoomEndToken);
     if (idx >= 0) visibleEndIndex = idx;
   }
   if (visibleStartIndex > visibleEndIndex) {
@@ -2004,7 +2045,7 @@ function makeOption(
   const chartWidth = chart.getWidth();
   const chartHeight = chart.getHeight();
   const xAxisLabelLayout = resolveXAxisLabelLayout(
-    months,
+    axisMonths,
     chartWidth,
     visibleStartIndex,
     visibleEndIndex,
@@ -2024,9 +2065,21 @@ function makeOption(
   const plotWidth = Math.max(1, plotBounds.right - plotBounds.left);
   const plotHeight = Math.max(1, plotBounds.bottom - plotBounds.top);
   const ySpan = Math.max(1e-6, yMax - yMin);
-  const monthIndexMap = new Map(months.map((month, index) => [month, index]));
+  const monthIndexMap = new Map();
+  axisMonths.forEach((axisMonth, index) => {
+    if (axisMonth) {
+      monthIndexMap.set(axisMonth, index);
+    }
+    const rawMonth = String(months[index] || "").trim();
+    if (rawMonth) {
+      monthIndexMap.set(rawMonth, index);
+    }
+  });
   const toPixelCoord = (month, value) => {
-    const monthIndex = monthIndexMap.get(month);
+    const normalizedMonth = normalizeMonthToken(month);
+    const monthIndex = monthIndexMap.has(normalizedMonth)
+      ? monthIndexMap.get(normalizedMonth)
+      : monthIndexMap.get(String(month || "").trim());
     if (!Number.isInteger(monthIndex) || !isFiniteNumber(value)) return null;
     const xRatio = months.length > 1 ? monthIndex / (months.length - 1) : 0;
     const yRatio = clampNumber((value - yMin) / ySpan, 0, 1);
@@ -2157,7 +2210,7 @@ function makeOption(
     ],
     xAxis: {
       type: "category",
-      data: months,
+      data: axisMonths,
       axisTick: {
         show: chartWidth > 760,
         interval: 0,
@@ -2177,14 +2230,14 @@ function makeOption(
         fontFamily: CHART_FONT_FAMILY,
         formatter(value, index) {
           if (!xAxisLabelLayout.isLabelVisible(value, index)) return "";
-          if (Number.isInteger(index) && typeof months[index] === "string" && months[index]) {
-            return xAxisLabelLayout.formatLabel(months[index]);
+          if (Number.isInteger(index) && typeof axisMonths[index] === "string" && axisMonths[index]) {
+            return xAxisLabelLayout.formatLabel(axisMonths[index]);
           }
-          const fallbackText = String(value || "");
-          if (/^\d{4}$/.test(fallbackText)) {
-            return `${fallbackText}-01`;
+          const normalizedValue = normalizeMonthToken(value);
+          if (normalizedValue) {
+            return xAxisLabelLayout.formatLabel(normalizedValue);
           }
-          return xAxisLabelLayout.formatLabel(fallbackText);
+          return xAxisLabelLayout.formatLabel(value);
         },
       },
     },
@@ -2218,7 +2271,7 @@ function makeOption(
 
       if (peakMarker) {
         markPointData.push({
-          coord: [peakMarker.month, peakMarker.value],
+          coord: [toAxisMonth(peakMarker.month), peakMarker.value],
           symbol: "circle",
           symbolSize: 2,
           itemStyle: {
@@ -2470,17 +2523,17 @@ function makeOption(
 
         markLineData.push([
           {
-            coord: [drawdown.peakMonth, drawdown.peakValue],
+            coord: [toAxisMonth(drawdown.peakMonth), drawdown.peakValue],
             symbol: "none",
           },
           {
-            coord: [drawdown.peakMonth, upperSegmentEnd],
+            coord: [toAxisMonth(drawdown.peakMonth), upperSegmentEnd],
             symbol: "none",
           },
         ]);
 
         markPointData.push({
-          coord: [drawdown.peakMonth, labelCenterValue],
+          coord: [toAxisMonth(drawdown.peakMonth), labelCenterValue],
           symbol: "circle",
           symbolSize: 2,
           itemStyle: {
@@ -2563,11 +2616,11 @@ function makeOption(
 
         markLineData.push([
           {
-            coord: [drawdown.peakMonth, lowerSegmentStart],
+            coord: [toAxisMonth(drawdown.peakMonth), lowerSegmentStart],
             symbol: "none",
           },
           {
-            coord: [drawdown.peakMonth, verticalArrowEnd],
+            coord: [toAxisMonth(drawdown.peakMonth), verticalArrowEnd],
             symbol: "arrow",
           },
         ]);
@@ -2575,26 +2628,26 @@ function makeOption(
         if (hasHorizontalLayout && recoverDisplayMonth) {
           markLineData.push([
             {
-              coord: [months[horizontalLayout.leftBreakIndex], drawdown.latestValue],
+              coord: [toAxisMonth(months[horizontalLayout.leftBreakIndex]), drawdown.latestValue],
               symbol: "none",
             },
             {
-              coord: [recoverDisplayMonth, drawdown.latestValue],
+              coord: [toAxisMonth(recoverDisplayMonth), drawdown.latestValue],
               symbol: "arrow",
             },
           ]);
           markLineData.push([
             {
-              coord: [months[horizontalLayout.rightBreakIndex], drawdown.latestValue],
+              coord: [toAxisMonth(months[horizontalLayout.rightBreakIndex]), drawdown.latestValue],
               symbol: "none",
             },
             {
-              coord: [drawdown.latestMonth, drawdown.latestValue],
+              coord: [toAxisMonth(drawdown.latestMonth), drawdown.latestValue],
               symbol: "arrow",
             },
           ]);
           markPointData.push({
-            coord: [months[labelCenterIndex], drawdown.latestValue],
+            coord: [toAxisMonth(months[labelCenterIndex]), drawdown.latestValue],
             symbol: "circle",
             symbolSize: 2,
             itemStyle: {
@@ -2826,14 +2879,20 @@ function render() {
   }
 
   const months = raw.dates.slice(startIndex, endIndex + 1);
+  const monthTokens = months.map((month) => normalizeMonthToken(month));
+  const findMonthIndexByToken = (monthValue) => {
+    const normalized = normalizeMonthToken(monthValue);
+    if (!normalized) return -1;
+    return monthTokens.findIndex((token) => token === normalized);
+  };
   let viewportStartOffset = 0;
   let viewportEndOffset = months.length - 1;
   if (typeof uiState.zoomStartMonth === "string") {
-    const idx = months.indexOf(uiState.zoomStartMonth);
+    const idx = findMonthIndexByToken(uiState.zoomStartMonth);
     if (idx >= 0) viewportStartOffset = idx;
   }
   if (typeof uiState.zoomEndMonth === "string") {
-    const idx = months.indexOf(uiState.zoomEndMonth);
+    const idx = findMonthIndexByToken(uiState.zoomEndMonth);
     if (idx >= 0) viewportEndOffset = idx;
   }
   if (viewportStartOffset > viewportEndOffset) {
@@ -2843,8 +2902,8 @@ function render() {
   const viewportMonths = months.slice(viewportStartOffset, viewportEndOffset + 1);
   const viewportStartMonth = viewportMonths[0] || startMonth;
   const viewportEndMonth = viewportMonths[viewportMonths.length - 1] || endMonth;
-  uiState.zoomStartMonth = viewportStartMonth;
-  uiState.zoomEndMonth = viewportEndMonth;
+  uiState.zoomStartMonth = normalizeMonthToken(viewportStartMonth) || viewportStartMonth;
+  uiState.zoomEndMonth = normalizeMonthToken(viewportEndMonth) || viewportEndMonth;
 
   const rendered = [];
   const missingBase = [];
@@ -3185,17 +3244,21 @@ function bindEvents() {
         sliderZoom.end,
         axisData,
       );
-      if (!nextStartMonth || !nextEndMonth || nextStartMonth > nextEndMonth) return;
+      const normalizedStartMonth = normalizeMonthToken(nextStartMonth);
+      const normalizedEndMonth = normalizeMonthToken(nextEndMonth);
+      if (!normalizedStartMonth || !normalizedEndMonth || normalizedStartMonth > normalizedEndMonth) {
+        return;
+      }
 
       if (
-        uiState.zoomStartMonth === nextStartMonth &&
-        uiState.zoomEndMonth === nextEndMonth
+        uiState.zoomStartMonth === normalizedStartMonth &&
+        uiState.zoomEndMonth === normalizedEndMonth
       ) {
         return;
       }
 
-      uiState.zoomStartMonth = nextStartMonth;
-      uiState.zoomEndMonth = nextEndMonth;
+      uiState.zoomStartMonth = normalizedStartMonth;
+      uiState.zoomEndMonth = normalizedEndMonth;
 
       isSyncingRangeFromSlider = true;
       try {
