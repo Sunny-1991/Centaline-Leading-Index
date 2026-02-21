@@ -118,6 +118,7 @@ const uiState = {
 let isApplyingOption = false;
 let latestRenderContext = null;
 let dataZoomSyncTimer = null;
+let pendingZoomPayload = null;
 let isSyncingRangeFromSlider = false;
 let textMeasureContext = null;
 let resizeRenderTimer = null;
@@ -141,6 +142,14 @@ function formatMonthZh(month) {
   if (!/^\d{4}-\d{2}$/.test(String(month))) return String(month || "-");
   const [year, m] = String(month).split("-");
   return `${year}年${Number(m)}月`;
+}
+
+function formatMonthDot(month) {
+  const token = normalizeMonthToken(month);
+  if (!token) return "";
+  const matched = token.match(/^(\d{4})-(\d{2})$/);
+  if (!matched) return token;
+  return `${matched[1]}.${matched[2]}`;
 }
 
 function normalizeMonthToken(value) {
@@ -333,11 +342,6 @@ function clampNumber(value, min, max) {
 function resolveAxisMonthFromZoomValue(value, percent, axisData) {
   if (!Array.isArray(axisData) || axisData.length === 0) return null;
 
-  if (Number.isFinite(percent)) {
-    const index = Math.round((clampNumber(Number(percent), 0, 100) / 100) * (axisData.length - 1));
-    return axisData[index] ?? null;
-  }
-
   const normalizedValueToken = normalizeMonthToken(value);
   if (typeof normalizedValueToken === "string" && axisData.includes(normalizedValueToken)) {
     return normalizedValueToken;
@@ -352,6 +356,29 @@ function resolveAxisMonthFromZoomValue(value, percent, axisData) {
     return axisData[index] ?? null;
   }
 
+  if (Number.isFinite(percent)) {
+    const index = Math.round((clampNumber(Number(percent), 0, 100) / 100) * (axisData.length - 1));
+    return axisData[index] ?? null;
+  }
+
+  return null;
+}
+
+function getZoomPayload(event) {
+  if (!event || typeof event !== "object") return null;
+  const candidates = Array.isArray(event.batch) ? event.batch : [event];
+  for (let i = candidates.length - 1; i >= 0; i -= 1) {
+    const item = candidates[i];
+    if (!item || typeof item !== "object") continue;
+    if (
+      Number.isFinite(item.start) ||
+      Number.isFinite(item.end) ||
+      typeof item.startValue !== "undefined" ||
+      typeof item.endValue !== "undefined"
+    ) {
+      return item;
+    }
+  }
   return null;
 }
 
@@ -495,7 +522,7 @@ function resolveXAxisLabelLayout(months, chartWidth, visibleStartIndex, visibleE
     formatLabel(value) {
       const text = normalizeMonthToken(value);
       if (!text) return "";
-      return text;
+      return formatMonthDot(text);
     },
     isLabelVisible(value, index) {
       const normalizedValue = normalizeMonthToken(value);
@@ -2125,6 +2152,22 @@ function makeOption(
       textStyle: {
         fontFamily: CHART_FONT_FAMILY,
       },
+      formatter(params) {
+        const rows = Array.isArray(params) ? params : [params];
+        if (!rows.length) return "";
+        const axisRaw = rows[0]?.axisValue ?? rows[0]?.axisValueLabel ?? "";
+        const headText = formatMonthDot(axisRaw);
+        const detail = rows
+          .map((item) => {
+            const value = Array.isArray(item?.value)
+              ? item.value[item.value.length - 1]
+              : item?.value;
+            const valueText = isFiniteNumber(value) ? value.toFixed(1) : "-";
+            return `${item?.marker || ""} ${item?.seriesName || "-"}&nbsp;&nbsp;${valueText}`;
+          })
+          .join("<br/>");
+        return `${headText}<br/>${detail}`;
+      },
       valueFormatter(value) {
         return isFiniteNumber(value) ? value.toFixed(1) : "-";
       },
@@ -3224,8 +3267,9 @@ function bindEvents() {
     render();
   });
 
-  chart.on("dataZoom", () => {
+  chart.on("dataZoom", (event) => {
     if (isApplyingOption || isSyncingRangeFromSlider) return;
+    pendingZoomPayload = getZoomPayload(event);
     if (dataZoomSyncTimer) {
       clearTimeout(dataZoomSyncTimer);
       dataZoomSyncTimer = null;
@@ -3243,14 +3287,29 @@ function bindEvents() {
         zoomList[0];
       if (!sliderZoom) return;
 
+      const zoomPayload = pendingZoomPayload || sliderZoom;
+      pendingZoomPayload = null;
+      const startValue = typeof zoomPayload?.startValue !== "undefined"
+        ? zoomPayload.startValue
+        : sliderZoom.startValue;
+      const endValue = typeof zoomPayload?.endValue !== "undefined"
+        ? zoomPayload.endValue
+        : sliderZoom.endValue;
+      const startPercent = Number.isFinite(zoomPayload?.start)
+        ? Number(zoomPayload.start)
+        : sliderZoom.start;
+      const endPercent = Number.isFinite(zoomPayload?.end)
+        ? Number(zoomPayload.end)
+        : sliderZoom.end;
+
       const nextStartMonth = resolveAxisMonthFromZoomValue(
-        sliderZoom.startValue,
-        sliderZoom.start,
+        startValue,
+        startPercent,
         axisData,
       );
       const nextEndMonth = resolveAxisMonthFromZoomValue(
-        sliderZoom.endValue,
-        sliderZoom.end,
+        endValue,
+        endPercent,
         axisData,
       );
       const normalizedStartMonth = normalizeMonthToken(nextStartMonth);
