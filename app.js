@@ -333,17 +333,22 @@ function clampNumber(value, min, max) {
 function resolveAxisMonthFromZoomValue(value, percent, axisData) {
   if (!Array.isArray(axisData) || axisData.length === 0) return null;
 
+  if (Number.isFinite(percent)) {
+    const index = Math.round((clampNumber(Number(percent), 0, 100) / 100) * (axisData.length - 1));
+    return axisData[index] ?? null;
+  }
+
+  const normalizedValueToken = normalizeMonthToken(value);
+  if (typeof normalizedValueToken === "string" && axisData.includes(normalizedValueToken)) {
+    return normalizedValueToken;
+  }
+
   if (typeof value === "string" && axisData.includes(value)) {
     return value;
   }
 
   if (Number.isFinite(value)) {
     const index = Math.round(clampNumber(Number(value), 0, axisData.length - 1));
-    return axisData[index] ?? null;
-  }
-
-  if (Number.isFinite(percent)) {
-    const index = Math.round((clampNumber(Number(percent), 0, 100) / 100) * (axisData.length - 1));
     return axisData[index] ?? null;
   }
 
