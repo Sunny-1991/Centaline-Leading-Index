@@ -459,7 +459,6 @@ function resolveXAxisLabelLayout(months, chartWidth, visibleStartIndex, visibleE
   }
 
   const finalVisibleIndexes = new Set(normalizedIndexes);
-  const showYearOnly = span >= 96;
 
   const visibleValues = new Set();
   finalVisibleIndexes.forEach((index) => {
@@ -476,9 +475,6 @@ function resolveXAxisLabelLayout(months, chartWidth, visibleStartIndex, visibleE
     formatLabel(value) {
       const text = String(value || "");
       if (!text) return "";
-      if (showYearOnly && text.length >= 4) {
-        return text.slice(0, 4);
-      }
       return text;
     },
     isLabelVisible(value, index) {
