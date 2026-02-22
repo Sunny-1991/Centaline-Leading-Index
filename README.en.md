@@ -2,7 +2,8 @@
 
 [中文说明](./README.md)
 
-A build-free static web dashboard for visualizing second-hand housing price indices across Chinese cities, with comparison tools, in-chart summary overlays, and high-resolution export.
+A build-free static web dashboard for visualizing second-hand housing price indices across Chinese cities, with comparison tools, in-chart summary overlays, and high-resolution export.  
+The monthly NBS auto-update runs in GitHub Actions and commits refreshed data files to the repo; the frontend runtime remains fully static.
 
 ## 1. Overview
 
@@ -140,6 +141,7 @@ The repository includes a built-in GitHub Actions workflow for monthly NBS updat
 
 The script now auto-truncates the timeline to the latest month available from the NBS API (no hard-coded end month).
 This automation is only for NBS data; paid Centaline data should continue to be updated manually.
+This does not turn the app into a dynamic backend service; pages still read static JS/JSON files from the repository.
 
 Optional environment variables (advanced usage):
 

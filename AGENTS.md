@@ -10,22 +10,27 @@
 
 ## Run
 ```bash
-cd "/Users/coattail/Documents/New project/house-price-dashboard"
-python3 -m http.server 8080
+cd "/path/to/Centaline-Leading-Index"
+python3 -m http.server 9013
 ```
-Open `http://localhost:8080`.
+Open `http://127.0.0.1:9013`.
 
 ## Data Workflow
 - 提取本地 Excel 并更新数据：
 ```bash
-cd "/Users/coattail/Documents/New project"
-node house-price-dashboard/scripts/extract-house-price-data.mjs
+cd "/path/to/Centaline-Leading-Index"
+node scripts/extract-house-price-data.mjs "/path/to/your.xlsx"
 ```
 - 拉取中原香港月度数据并合并：
 ```bash
-cd "/Users/coattail/Documents/New project"
-node house-price-dashboard/scripts/fetch-hk-centaline-monthly.mjs
-node house-price-dashboard/scripts/extract-house-price-data.mjs
+cd "/path/to/Centaline-Leading-Index"
+node scripts/fetch-hk-centaline-monthly.mjs
+node scripts/extract-house-price-data.mjs "/path/to/your.xlsx"
+```
+- 拉取统计局 70 城并生成链式数据：
+```bash
+cd "/path/to/Centaline-Leading-Index"
+node scripts/fetch-nbs-70city-secondhand.mjs
 ```
 
 ## File Map
@@ -37,6 +42,7 @@ node house-price-dashboard/scripts/extract-house-price-data.mjs
 - `hk-centaline-monthly.json`: 香港中原月度数据缓存
 - `scripts/extract-house-price-data.mjs`: Excel 提取与合并脚本
 - `scripts/fetch-hk-centaline-monthly.mjs`: 香港数据抓取脚本
+- `scripts/fetch-nbs-70city-secondhand.mjs`: 统计局 70 城抓取与链式构建脚本
 
 ## Guardrails
 - 保持项目为 build-free 的静态站点，不引入前端框架。
