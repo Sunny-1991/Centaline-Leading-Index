@@ -1558,10 +1558,18 @@ async function captureChartStageSnapshot(pixelRatio = 2) {
     ? Number(gridBottomRaw)
     : CHART_GRID_LAYOUT.bottom;
   const exportGridBottom = Math.max(72, gridBottom - 28);
+  const legendBottomRaw = option.legend?.[0]?.bottom;
+  const legendBottom = Number.isFinite(Number(legendBottomRaw))
+    ? Number(legendBottomRaw)
+    : 10;
+  const exportLegendBottom = clampNumber(legendBottom + 14, legendBottom, 34);
 
   const hideOption = {
     toolbox: {
       show: false,
+    },
+    legend: {
+      bottom: exportLegendBottom,
     },
     grid: {
       bottom: exportGridBottom,
@@ -1590,6 +1598,9 @@ async function captureChartStageSnapshot(pixelRatio = 2) {
     const restoreOption = {
       toolbox: {
         show: toolboxShow,
+      },
+      legend: {
+        bottom: legendBottom,
       },
       grid: {
         bottom: gridBottom,
