@@ -1557,12 +1557,13 @@ async function captureChartStageSnapshot(pixelRatio = 2) {
   const gridBottom = Number.isFinite(Number(gridBottomRaw))
     ? Number(gridBottomRaw)
     : CHART_GRID_LAYOUT.bottom;
-  const exportGridBottom = Math.max(72, gridBottom - 28);
+  const exportGridBottom = Math.max(60, gridBottom - 46);
   const legendBottomRaw = option.legend?.[0]?.bottom;
   const legendBottom = Number.isFinite(Number(legendBottomRaw))
     ? Number(legendBottomRaw)
     : 10;
-  const exportLegendBottom = clampNumber(legendBottom + 14, legendBottom, 34);
+  const exportLegendBottom = clampNumber(legendBottom + 8, legendBottom, 24);
+  const exportTrimBottomPx = Math.max(8, Math.round(10 * pixelRatio));
 
   const hideOption = {
     toolbox: {
@@ -1618,8 +1619,31 @@ async function captureChartStageSnapshot(pixelRatio = 2) {
   }
 
   if (!stageCanvas) return null;
+
+  let outputCanvas = stageCanvas;
+  if (stageCanvas.height > exportTrimBottomPx + 1) {
+    const trimmedCanvas = document.createElement("canvas");
+    trimmedCanvas.width = stageCanvas.width;
+    trimmedCanvas.height = stageCanvas.height - exportTrimBottomPx;
+    const trimmedCtx = trimmedCanvas.getContext("2d");
+    if (trimmedCtx) {
+      trimmedCtx.drawImage(
+        stageCanvas,
+        0,
+        0,
+        stageCanvas.width,
+        trimmedCanvas.height,
+        0,
+        0,
+        trimmedCanvas.width,
+        trimmedCanvas.height,
+      );
+      outputCanvas = trimmedCanvas;
+    }
+  }
+
   return {
-    dataURL: stageCanvas.toDataURL("image/png"),
+    dataURL: outputCanvas.toDataURL("image/png"),
   };
 }
 
