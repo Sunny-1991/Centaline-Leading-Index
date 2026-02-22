@@ -15,7 +15,7 @@
     <script defer src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
     <script defer src="house-price-data.js"></script>
     <script defer src="house-price-data-nbs-70.js"></script>
-    <script defer src="app.js?v=20260221-axis-yyyy-mm"></script>
+    <script defer src="app.js?v=20260222-theme-bloomberg"></script>
   </head>
   <body>
     <main class="page">
@@ -35,6 +35,17 @@
             <label>
               选择数据源
               <select id="dataSource" aria-label="数据源选择"></select>
+            </label>
+          </div>
+
+          <div class="control-block">
+            <h3>页面主题</h3>
+            <label>
+              显示风格
+              <select id="themeMode" aria-label="页面主题">
+                <option value="light">浅色专业版</option>
+                <option value="dark">深色 Bloomberg 风格</option>
+              </select>
             </label>
           </div>
 

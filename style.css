@@ -37,6 +37,28 @@ body {
     linear-gradient(180deg, #f7fbfd 0%, #edf4f9 54%, #e6eef5 100%);
 }
 
+body.theme-bloomberg {
+  --bg-ink: #deebf4;
+  --bg-paper: #0a1118;
+  --panel: rgba(13, 20, 28, 0.9);
+  --panel-strong: rgba(17, 25, 34, 0.92);
+  --line: #243648;
+  --line-strong: #3a5266;
+  --title: #eef5fb;
+  --text: #c8d4df;
+  --soft: #97acbc;
+  --accent: #f2a744;
+  --accent-strong: #c67d24;
+  --warn: #ff7b6e;
+  --shadow: 0 20px 46px rgba(0, 0, 0, 0.46);
+  --shadow-soft: 0 10px 22px rgba(0, 0, 0, 0.34);
+  --ring: 0 0 0 3px rgba(242, 167, 68, 0.24);
+  background:
+    radial-gradient(76rem 48rem at 90% -10%, rgba(56, 107, 148, 0.24), transparent 69%),
+    radial-gradient(62rem 40rem at -8% 108%, rgba(58, 86, 112, 0.22), transparent 71%),
+    linear-gradient(180deg, #0d151d 0%, #0a1118 56%, #0a1016 100%);
+}
+
 .page {
   width: min(1600px, 96vw);
   margin: 24px auto 28px;
@@ -535,6 +557,143 @@ thead th {
   line-height: 1.5;
   font-family: var(--ui-font);
   padding: 2px 2px 0;
+}
+
+body.theme-bloomberg .hero {
+  border-color: #2d4356;
+  background: linear-gradient(145deg, rgba(16, 24, 34, 0.95), rgba(12, 19, 27, 0.94));
+}
+
+body.theme-bloomberg .hero::after {
+  background: linear-gradient(90deg, rgba(242, 167, 68, 0.86), rgba(242, 167, 68, 0));
+}
+
+body.theme-bloomberg .controls,
+body.theme-bloomberg .chart-zone {
+  border-color: #2b3f52;
+  background: var(--panel);
+}
+
+body.theme-bloomberg .control-block {
+  border-color: #2f4557;
+  background: rgba(18, 27, 37, 0.92);
+}
+
+body.theme-bloomberg button {
+  border-color: #4b6275;
+  background: linear-gradient(180deg, #1d2a36, #141d27);
+  color: #d4e0ea;
+}
+
+body.theme-bloomberg button:hover {
+  border-color: var(--accent);
+  color: #ffd9a5;
+}
+
+body.theme-bloomberg .inline-actions button {
+  background: linear-gradient(180deg, rgba(35, 49, 63, 0.98), rgba(23, 34, 45, 0.98));
+}
+
+body.theme-bloomberg select {
+  border-color: #486177;
+  background: #121c27;
+  color: #d3dde7;
+}
+
+body.theme-bloomberg .primary-btn {
+  border-color: #d28b2e;
+  background: linear-gradient(160deg, #f2a744, #b9721f);
+  color: #131a21;
+}
+
+body.theme-bloomberg .primary-btn:hover {
+  color: #111821;
+  filter: brightness(1.05);
+}
+
+body.theme-bloomberg .analysis-btn {
+  border-color: #4b6276;
+  background: linear-gradient(160deg, #2f4356, #223242);
+  color: #c2d0dc;
+}
+
+body.theme-bloomberg .analysis-btn:disabled {
+  border-color: #3c4f61;
+  background: linear-gradient(160deg, #253442, #1c2732);
+  color: #7f94a5;
+}
+
+body.theme-bloomberg .analysis-btn.enabled {
+  border-color: #d28b2e;
+  background: linear-gradient(160deg, #f2a744, #be7a23);
+  color: #121920;
+}
+
+body.theme-bloomberg .analysis-btn.enabled:hover {
+  color: #121920;
+}
+
+body.theme-bloomberg .analysis-btn:disabled:hover {
+  border-color: #3c4f61;
+  color: #7f94a5;
+}
+
+body.theme-bloomberg .chart-zone {
+  background: linear-gradient(180deg, rgba(17, 26, 35, 0.94), rgba(12, 19, 27, 0.92));
+}
+
+body.theme-bloomberg .chart {
+  border-color: #2f4659;
+  background: #0f1821;
+}
+
+body.theme-bloomberg .table-wrap {
+  border-color: #2f4558;
+  background: rgba(16, 24, 33, 0.94);
+  box-shadow: inset 0 1px 0 rgba(166, 189, 208, 0.08);
+}
+
+body.theme-bloomberg th,
+body.theme-bloomberg td {
+  border-bottom-color: #2f4658;
+}
+
+body.theme-bloomberg .table-wrap th:first-child,
+body.theme-bloomberg .table-wrap td:first-child {
+  background: #1a2734;
+}
+
+body.theme-bloomberg .table-wrap thead th:first-child,
+body.theme-bloomberg thead th {
+  background: #1e2e3d;
+}
+
+body.theme-bloomberg .chart-stats-overlay table {
+  border-top-color: #8ea3b4;
+  border-bottom-color: #8ea3b4;
+}
+
+body.theme-bloomberg .chart-stats-overlay th,
+body.theme-bloomberg .chart-stats-overlay td {
+  color: #e1e9f1;
+}
+
+body.theme-bloomberg .chart-stats-overlay th {
+  border-bottom-color: #8ea3b4;
+}
+
+body.theme-bloomberg .chart-stats-overlay thead th {
+  color: #e8eef5;
+}
+
+body.theme-bloomberg .chart-stats-title-main,
+body.theme-bloomberg .chart-stats-title-sub,
+body.theme-bloomberg .chart-stats-note {
+  color: #e8eef5;
+}
+
+body.theme-bloomberg .chart-stats-source-tag {
+  color: #9fb2c1;
 }
 
 @media (max-width: 1120px) {
