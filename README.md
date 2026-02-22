@@ -42,7 +42,7 @@
 ## 4. 本地运行
 
 ```bash
-cd "/Users/coattail/Documents/New project/Centaline-Leading-Index"
+cd "/path/to/Centaline-Leading-Index"
 python3 -m http.server 9013
 ```
 
@@ -90,7 +90,7 @@ python3 -m http.server 9013
 ### 7.1 拉取香港 CCL 月度（按月末周值）
 
 ```bash
-cd "/Users/coattail/Documents/New project/Centaline-Leading-Index"
+cd "/path/to/Centaline-Leading-Index"
 node scripts/fetch-hk-centaline-monthly.mjs
 ```
 
@@ -99,7 +99,7 @@ node scripts/fetch-hk-centaline-monthly.mjs
 ### 7.2 从 Excel 提取中原主数据并合并香港
 
 ```bash
-cd "/Users/coattail/Documents/New project/Centaline-Leading-Index"
+cd "/path/to/Centaline-Leading-Index"
 node scripts/extract-house-price-data.mjs "/你的Excel路径.xlsx"
 ```
 
@@ -111,7 +111,7 @@ node scripts/extract-house-price-data.mjs "/你的Excel路径.xlsx"
 ### 7.3 拉取并构建统计局 70 城链式序列
 
 ```bash
-cd "/Users/coattail/Documents/New project/Centaline-Leading-Index"
+cd "/path/to/Centaline-Leading-Index"
 node scripts/fetch-nbs-70city-secondhand.mjs
 ```
 

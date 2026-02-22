@@ -42,7 +42,7 @@ A build-free static web dashboard for visualizing second-hand housing price indi
 ## 4. Run Locally
 
 ```bash
-cd "/Users/coattail/Documents/New project/Centaline-Leading-Index"
+cd "/path/to/Centaline-Leading-Index"
 python3 -m http.server 9013
 ```
 
@@ -90,7 +90,7 @@ Recommended order: **Hong Kong monthly -> Centaline main data -> NBS 70-city**.
 ### 7.1 Fetch Hong Kong CCL monthly series
 
 ```bash
-cd "/Users/coattail/Documents/New project/Centaline-Leading-Index"
+cd "/path/to/Centaline-Leading-Index"
 node scripts/fetch-hk-centaline-monthly.mjs
 ```
 
@@ -99,7 +99,7 @@ Output: `hk-centaline-monthly.json`
 ### 7.2 Extract Centaline data from Excel and merge Hong Kong
 
 ```bash
-cd "/Users/coattail/Documents/New project/Centaline-Leading-Index"
+cd "/path/to/Centaline-Leading-Index"
 node scripts/extract-house-price-data.mjs "/path/to/your.xlsx"
 ```
 
@@ -111,7 +111,7 @@ Outputs:
 ### 7.3 Fetch and build NBS 70-city chain-linked series
 
 ```bash
-cd "/Users/coattail/Documents/New project/Centaline-Leading-Index"
+cd "/path/to/Centaline-Leading-Index"
 node scripts/fetch-nbs-70city-secondhand.mjs
 ```
 
