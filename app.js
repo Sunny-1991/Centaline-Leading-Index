@@ -1689,10 +1689,23 @@ async function captureChartStageSnapshot(pixelRatio = 2) {
   if (!stageRect.width || !stageRect.height) return null;
   const chartTheme = getActiveChartThemeStyle();
   const option = chart.getOption?.() || {};
+  const toolboxConfig = Array.isArray(option.toolbox) ? option.toolbox[0] : option.toolbox;
+  const toolboxShow = toolboxConfig ? toolboxConfig.show !== false : false;
   const sliderDataZoom = Array.isArray(option.dataZoom)
     ? option.dataZoom.find((item) => item?.type === "slider")
     : null;
   const sliderShow = sliderDataZoom ? sliderDataZoom.show !== false : false;
+
+  if (toolboxShow) {
+    chart.setOption(
+      {
+        toolbox: {
+          show: false,
+        },
+      },
+      { lazyUpdate: false },
+    );
+  }
 
   if (sliderDataZoom && sliderShow) {
     chart.setOption(
@@ -1710,7 +1723,7 @@ async function captureChartStageSnapshot(pixelRatio = 2) {
 
   let stageCanvas = null;
   try {
-    if (sliderDataZoom && sliderShow) {
+    if (toolboxShow || (sliderDataZoom && sliderShow)) {
       await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     }
     stageCanvas = await window.html2canvas(chartStageEl, {
@@ -1720,6 +1733,16 @@ async function captureChartStageSnapshot(pixelRatio = 2) {
       logging: false,
     });
   } finally {
+    if (toolboxShow) {
+      chart.setOption(
+        {
+          toolbox: {
+            show: true,
+          },
+        },
+        { lazyUpdate: false },
+      );
+    }
     if (sliderDataZoom && sliderShow) {
       chart.setOption(
         {
