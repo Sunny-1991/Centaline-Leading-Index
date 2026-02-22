@@ -2067,7 +2067,14 @@ function rectsOverlap(a, b, padding = 2) {
   );
 }
 
-function resolvePeakLabelLayouts(rendered, months, yMin, yMax, labelGapMonths) {
+function resolvePeakLabelLayouts(
+  rendered,
+  months,
+  yMin,
+  yMax,
+  labelGapMonths,
+  responsiveChartWidth = chart.getWidth(),
+) {
   const layoutMap = new Map();
   if (!Array.isArray(rendered) || rendered.length === 0 || !Array.isArray(months) || months.length === 0) {
     return layoutMap;
@@ -2106,19 +2113,49 @@ function resolvePeakLabelLayouts(rendered, months, yMin, yMax, labelGapMonths) {
 
   const occupiedRects = [];
 
-  const topCandidateStyles = [
-    { position: "top", distance: 7, fontSize: 12, padding: [2, 6] },
-    { position: "top", distance: 5, fontSize: 12, padding: [2, 6] },
-    { position: "top", distance: 9, fontSize: 11, padding: [2, 5] },
-    { position: "top", distance: 4, fontSize: 11, padding: [2, 5] },
-    { position: "top", distance: 11, fontSize: 10, padding: [1, 4] },
-  ];
-  const fallbackCandidateStyles = [
-    { position: "bottom", distance: 6, fontSize: 11, padding: [2, 5] },
-    { position: "bottom", distance: 8, fontSize: 10, padding: [1, 4] },
-  ];
-  const candidateOffsetX = [0, -8, 8, -14, 14, -20, 20, -26, 26];
-  const candidateOffsetY = [0, 3, -3, 6];
+  const compactMobile = responsiveChartWidth <= 520;
+  const mediumMobile = responsiveChartWidth > 520 && responsiveChartWidth <= 760;
+  const topCandidateStyles = compactMobile
+    ? [
+        { position: "top", distance: 5, fontSize: 9.2, padding: [1, 4] },
+        { position: "top", distance: 4, fontSize: 9.2, padding: [1, 4] },
+        { position: "top", distance: 6, fontSize: 8.7, padding: [1, 3] },
+        { position: "top", distance: 3, fontSize: 8.7, padding: [1, 3] },
+        { position: "top", distance: 7, fontSize: 8.2, padding: [1, 3] },
+      ]
+    : mediumMobile
+      ? [
+          { position: "top", distance: 6, fontSize: 10.6, padding: [1, 5] },
+          { position: "top", distance: 5, fontSize: 10.6, padding: [1, 5] },
+          { position: "top", distance: 8, fontSize: 9.9, padding: [1, 4] },
+          { position: "top", distance: 4, fontSize: 9.9, padding: [1, 4] },
+          { position: "top", distance: 9, fontSize: 9.3, padding: [1, 4] },
+        ]
+      : [
+          { position: "top", distance: 7, fontSize: 12, padding: [2, 6] },
+          { position: "top", distance: 5, fontSize: 12, padding: [2, 6] },
+          { position: "top", distance: 9, fontSize: 11, padding: [2, 5] },
+          { position: "top", distance: 4, fontSize: 11, padding: [2, 5] },
+          { position: "top", distance: 11, fontSize: 10, padding: [1, 4] },
+        ];
+  const fallbackCandidateStyles = compactMobile
+    ? [
+        { position: "bottom", distance: 5, fontSize: 8.7, padding: [1, 3] },
+        { position: "bottom", distance: 6, fontSize: 8.2, padding: [1, 3] },
+      ]
+    : mediumMobile
+      ? [
+          { position: "bottom", distance: 6, fontSize: 9.9, padding: [1, 4] },
+          { position: "bottom", distance: 7, fontSize: 9.3, padding: [1, 4] },
+        ]
+      : [
+          { position: "bottom", distance: 6, fontSize: 11, padding: [2, 5] },
+          { position: "bottom", distance: 8, fontSize: 10, padding: [1, 4] },
+        ];
+  const candidateOffsetX = compactMobile
+    ? [0, -6, 6, -10, 10, -14, 14, -18, 18]
+    : [0, -8, 8, -14, 14, -20, 20, -26, 26];
+  const candidateOffsetY = compactMobile ? [0, 2, -2, 4] : [0, 3, -3, 6];
   const peakAnnotations = rendered
     .filter((item) => item.peakMarker && isFiniteNumber(item.peakMarker.value))
     .map((item) => {
@@ -2279,15 +2316,23 @@ function buildPeakLabelRectList(rendered, peakLabelLayouts, toPixelCoord) {
   return rects;
 }
 
-function resolveDrawdownValueLabelOffset(anchorX, anchorY, peakLabelRects, chartBounds) {
+function resolveDrawdownValueLabelOffset(
+  anchorX,
+  anchorY,
+  peakLabelRects,
+  chartBounds,
+  labelFontSize = 14,
+  labelPadding = [2, 4],
+) {
   if (!Number.isFinite(anchorX) || !Number.isFinite(anchorY) || !Array.isArray(peakLabelRects)) {
     return [0, 0];
   }
 
   const labelLines = ["累计跌幅", "00.0%"];
-  const labelBox = estimateLabelBox(labelLines, 14, [2, 4], 700);
-  const maxOffsetPx = 24;
-  const offsetCandidates = [0, -4, 4, -8, 8, -12, 12, -16, 16, -20, 20, -24, 24].filter(
+  const labelBox = estimateLabelBox(labelLines, labelFontSize, labelPadding, 700);
+  const step = labelFontSize <= 10 ? 3 : 4;
+  const maxOffsetPx = Math.max(16, Math.round(labelFontSize * 1.9));
+  const offsetCandidates = [0, -step, step, -(step * 2), step * 2, -(step * 3), step * 3, -(step * 4), step * 4, -(step * 5), step * 5, -(step * 6), step * 6].filter(
     (offsetY) => Math.abs(offsetY) <= maxOffsetPx,
   );
 
@@ -2416,21 +2461,36 @@ function makeOption(
     4,
     Math.round((92 * Math.max(1, months.length - 1)) / usableChartWidth),
   );
-  const peakLabelLayouts = resolvePeakLabelLayouts(rendered, months, yMin, yMax, labelGapMonths);
+  const peakLabelLayouts = resolvePeakLabelLayouts(
+    rendered,
+    months,
+    yMin,
+    yMax,
+    labelGapMonths,
+    responsiveChartWidth,
+  );
   const xAxisLabelLayout = resolveXAxisLabelLayout(
     axisMonths,
     chartWidth,
     visibleStartIndex,
     visibleEndIndex,
   );
-  const endLabelFontSize = responsiveChartWidth <= 520 ? 14 : responsiveChartWidth <= 760 ? 16 : 18;
-  const legendBaseFontSize = responsiveChartWidth <= 520 ? 12.5 : responsiveChartWidth <= 760 ? 13.5 : 15;
+  const compactMobile = responsiveChartWidth <= 520;
+  const mediumMobile = responsiveChartWidth > 520 && responsiveChartWidth <= 760;
+  const endLabelFontSize = compactMobile ? 11 : mediumMobile ? 14 : 18;
+  const legendBaseFontSize = compactMobile ? 10.8 : mediumMobile ? 12.2 : 15;
   const legendFontSize = Number((legendBaseFontSize * 1.05).toFixed(2));
-  const xAxisLabelFontSize = Number((xAxisLabelLayout.fontSize * 1.1).toFixed(2));
-  const yAxisLabelFontSize = responsiveChartWidth <= 520 ? 12 : responsiveChartWidth <= 760 ? 13 : 14;
-  const seriesLineWidth = responsiveChartWidth <= 520 ? 1.88 : responsiveChartWidth <= 760 ? 2.1 : 3.02;
-  const markLineWidth = responsiveChartWidth <= 520 ? 1.15 : responsiveChartWidth <= 760 ? 1.32 : 2;
-  const markSymbolSize = responsiveChartWidth <= 520 ? 8 : responsiveChartWidth <= 760 ? 9 : 10;
+  const xAxisLabelScale = compactMobile ? 0.98 : 1.1;
+  const xAxisLabelFontSize = Number((xAxisLabelLayout.fontSize * xAxisLabelScale).toFixed(2));
+  const yAxisLabelFontSize = compactMobile ? 11 : mediumMobile ? 12 : 14;
+  const seriesLineWidth = compactMobile ? 1.7 : mediumMobile ? 2.1 : 3.02;
+  const markLineWidth = compactMobile ? 1.04 : mediumMobile ? 1.32 : 2;
+  const markSymbolSize = compactMobile ? 7 : mediumMobile ? 9 : 10;
+  const drawdownLabelFontSize = compactMobile ? 10 : mediumMobile ? 12 : 14;
+  const drawdownLabelPadding = compactMobile ? [1, 3] : mediumMobile ? [1, 4] : [2, 4];
+  const recoverLabelFontSize = compactMobile ? 9.5 : mediumMobile ? 11 : 14;
+  const recoverLabelPadding = compactMobile ? [1, 2] : mediumMobile ? [1, 2] : [1, 2];
+  const baseTextFontSize = compactMobile ? 12 : mediumMobile ? 13 : 14;
   const sliderBaseHeight = responsiveChartWidth <= 520 ? 12 : responsiveChartWidth <= 760 ? 13 : 14;
   const sliderHeight = Math.max(10, Math.round(sliderBaseHeight * 1.1));
   const sliderBottom = Math.max(0, gridLayout.bottom - Math.round(sliderHeight / 2));
@@ -2488,7 +2548,7 @@ function makeOption(
     animationDuration: 650,
     textStyle: {
       fontFamily: CHART_FONT_FAMILY,
-      fontSize: 14,
+      fontSize: baseTextFontSize,
       color: chartTheme.chartTextColor,
     },
     tooltip: {
@@ -2709,7 +2769,12 @@ function makeOption(
 
       if (drawdown) {
         const drawdownLabelLines = ["累计跌幅", "00.0%"];
-        const drawdownLabelBox = estimateLabelBox(drawdownLabelLines, 14, [2, 4], 700);
+        const drawdownLabelBox = estimateLabelBox(
+          drawdownLabelLines,
+          drawdownLabelFontSize,
+          drawdownLabelPadding,
+          700,
+        );
         const verticalMid = (drawdown.peakValue + drawdown.latestValue) / 2;
         const drawdownLabelAnchor = toPixelCoord(drawdown.peakMonth, verticalMid);
         const drawdownLabelOffset = drawdownLabelAnchor
@@ -2718,6 +2783,8 @@ function makeOption(
               drawdownLabelAnchor.y,
               peakLabelRects,
               labelBounds,
+              drawdownLabelFontSize,
+              drawdownLabelPadding,
             )
           : [0, 0];
         const drawdownVerticalLayout = resolveDrawdownVerticalLayout(
@@ -2960,10 +3027,10 @@ function makeOption(
             verticalAlign: "middle",
             color: item.color,
             fontFamily: CHART_FONT_FAMILY,
-            fontSize: 14,
+            fontSize: drawdownLabelFontSize,
             fontWeight: 700,
             backgroundColor: chartTextMaskColor,
-            padding: [2, 4],
+            padding: drawdownLabelPadding,
             offset: [drawdownLabelOffsetX, 0],
             formatter: `累计跌幅\n${Math.abs(drawdown.drawdownPct).toFixed(1)}%`,
           },
@@ -2985,7 +3052,12 @@ function makeOption(
         const recoverLabelText = drawdown.recoverMonth
           ? `跌回 ${drawdown.recoverMonth.replace("-", ".")}`
           : "跌回 -";
-        const recoverLabelBox = estimateLabelBox([recoverLabelText], 14, [1, 2], 700);
+        const recoverLabelBox = estimateLabelBox(
+          [recoverLabelText],
+          recoverLabelFontSize,
+          recoverLabelPadding,
+          700,
+        );
         const rawHorizontalLayout = buildDrawdownHorizontalLayout(drawdown, {
           visibleStartIndex,
           visibleEndIndex,
@@ -3074,10 +3146,10 @@ function makeOption(
               verticalAlign: "middle",
               color: item.color,
               fontFamily: CHART_FONT_FAMILY,
-              fontSize: 14,
+              fontSize: recoverLabelFontSize,
               fontWeight: 700,
               backgroundColor: chartTextMaskColor,
-              padding: [1, 2],
+              padding: recoverLabelPadding,
               formatter: recoverLabelText,
             },
           });
@@ -3099,7 +3171,7 @@ function makeOption(
       const endLabelMainText = item.endLabelMain || item.name;
       const endLabelSubText = item.endLabelSub || "";
       const endLabelBoxWidth = endLabelSubText
-        ? Math.max(86, Math.round(endLabelFontSize * 5.4))
+        ? Math.max(compactMobile ? 64 : 78, Math.round(endLabelFontSize * (compactMobile ? 4.4 : 5.2)))
         : null;
 
       return {
@@ -3122,8 +3194,8 @@ function makeOption(
         endLabel: {
           show: true,
           position: "right",
-          distance: endLabelSubText ? 5 : 12,
-          offset: endLabelSubText ? [-24, 0] : [-6, 0],
+          distance: endLabelSubText ? (compactMobile ? 3 : 5) : (compactMobile ? 6 : 12),
+          offset: endLabelSubText ? (compactMobile ? [-14, 0] : [-24, 0]) : (compactMobile ? [-2, 0] : [-6, 0]),
           formatter() {
             if (endLabelSubText) {
               return `{main|${endLabelMainText}}\n{sub|${endLabelSubText}}`;
@@ -3143,9 +3215,12 @@ function makeOption(
               fontWeight: 700,
               width: endLabelBoxWidth || undefined,
               align: endLabelSubText ? "center" : "left",
-              fontSize: Math.max(10, Math.round(endLabelFontSize * (item.endLabelMainScale || 1))),
+              fontSize: Math.max(
+                compactMobile ? 8.6 : 10,
+                Math.round(endLabelFontSize * (item.endLabelMainScale || 1)),
+              ),
               lineHeight: Math.max(
-                13,
+                compactMobile ? 10 : 13,
                 Math.round(endLabelFontSize * (item.endLabelMainScale || 1) * 1.08),
               ),
             },
@@ -3155,9 +3230,12 @@ function makeOption(
               fontWeight: 600,
               width: endLabelBoxWidth || undefined,
               align: endLabelSubText ? "center" : "left",
-              fontSize: Math.max(8, Math.round(endLabelFontSize * (item.endLabelSubScale || 0.82))),
+              fontSize: Math.max(
+                compactMobile ? 6.8 : 8,
+                Math.round(endLabelFontSize * (item.endLabelSubScale || 0.82)),
+              ),
               lineHeight: Math.max(
-                10,
+                compactMobile ? 8 : 10,
                 Math.round(endLabelFontSize * (item.endLabelSubScale || 0.82) * 1.05),
               ),
             },

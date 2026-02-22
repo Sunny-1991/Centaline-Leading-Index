@@ -722,6 +722,7 @@ select:focus {
 
 .table-wrap {
   overflow: auto;
+  -webkit-overflow-scrolling: touch;
   border: 1px solid var(--line);
   border-radius: 12px;
   background:
@@ -955,13 +956,14 @@ thead th {
   }
 
   table {
-    min-width: 760px;
+    min-width: 660px;
   }
 
   th,
   td {
-    font-size: 0.8rem;
-    padding: 7px 8px;
+    font-size: 0.76rem;
+    padding: 6px 7px;
+    white-space: nowrap;
   }
 
   .footnote {
@@ -1055,6 +1057,18 @@ thead th {
   }
 
   table {
-    min-width: 700px;
+    min-width: 580px;
+  }
+
+  th,
+  td {
+    font-size: 0.72rem;
+    padding: 5px 6px;
+    line-height: 1.2;
+  }
+
+  .table-wrap th:first-child,
+  .table-wrap td:first-child {
+    min-width: 60px;
   }
 }
