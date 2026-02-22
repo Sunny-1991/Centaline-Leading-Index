@@ -354,6 +354,14 @@ function applyDataSource(sourceKey) {
     dataSourceEl.value = source.key;
   }
   cityListEl.classList.toggle(CITY_LIST_THREE_COLS_CLASS, source.key === "nbs70");
+  const canUseSelectAll = source.key !== "nbs70";
+  if (selectAllBtn) {
+    selectAllBtn.hidden = !canUseSelectAll;
+    selectAllBtn.disabled = !canUseSelectAll;
+  }
+  if (clearAllBtn) {
+    clearAllBtn.style.gridColumn = canUseSelectAll ? "" : "1 / -1";
+  }
 
   uiState.hiddenCityNames.clear();
   uiState.zoomStartMonth = null;
