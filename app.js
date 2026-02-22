@@ -1779,10 +1779,11 @@ function drawOverlaySummaryOnCanvas(ctx, canvasWidth, canvasHeight, exportContex
   const basePrefix = "定基";
   const prefixWidth = ctx.measureText(basePrefix).width;
   const valueWidth = measureOverlayTextSegments(ctx, baseValueSegments);
-  const baseStartX = centerX - (prefixWidth + valueWidth) / 2;
+  const baseGap = Math.max(1, subFontSize * 0.08);
+  const baseStartX = centerX - (prefixWidth + baseGap + valueWidth) / 2;
   const prefixNudgeY = -(subFontSize * 0.04);
   ctx.fillText(basePrefix, baseStartX, cursorY + prefixNudgeY);
-  drawOverlayTextSegments(ctx, baseStartX + prefixWidth, cursorY, baseValueSegments, digitDropY);
+  drawOverlayTextSegments(ctx, baseStartX + prefixWidth + baseGap, cursorY, baseValueSegments, digitDropY);
   ctx.textAlign = "center";
   cursorY += Math.round(subFontSize * 1.2);
 

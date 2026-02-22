@@ -683,6 +683,7 @@ select:focus {
 .chart-stats-base-prefix {
   display: inline-block;
   transform: translateY(-0.04em);
+  margin-right: 0.08em;
 }
 
 .chart-stats-base-value {
