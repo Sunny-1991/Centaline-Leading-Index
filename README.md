@@ -126,7 +126,28 @@ node scripts/fetch-nbs-70city-secondhand.mjs
 - 网络抓取脚本依赖可用网络（`curl` / `fetch`）
 - 建议 Node.js 18+
 
-## 8. 目录结构
+## 8. 自动月更（统计局）
+
+项目已内置 GitHub Actions 自动月更流程：
+
+- 工作流文件：`.github/workflows/auto-update-nbs-data.yml`
+- 触发方式：
+  - 每月定时运行（UTC 时间）
+  - GitHub Actions 页面手动触发（`workflow_dispatch`）
+- 行为：
+  - 执行 `node scripts/fetch-nbs-70city-secondhand.mjs`
+  - 仅在 `house-price-data-nbs-70.js` / `house-price-data-nbs-70.json` 发生变化时自动提交并推送
+
+脚本会根据统计局接口的最新可用月份自动截断时间轴，不再写死到某个固定月份。
+该自动流程仅覆盖统计局数据；中原付费数据建议继续人工更新后再提交。
+
+可选环境变量（高级用法）：
+
+- `NBS_OUTPUT_MIN_MONTH`（默认 `2008-01`）
+- `NBS_OUTPUT_BASE_MONTH`（默认 `2008-01`）
+- `NBS_OUTPUT_MAX_MONTH`（默认当前 UTC 月，最终会与接口最新月份取较小值）
+
+## 9. 目录结构
 
 ```text
 Centaline-Leading-Index/
@@ -145,7 +166,7 @@ Centaline-Leading-Index/
 └── README.md
 ```
 
-## 9. 发布到 GitHub Pages
+## 10. 发布到 GitHub Pages
 
 本项目为纯静态站点，推送到 `main` 分支即可。
 
@@ -157,7 +178,7 @@ Centaline-Leading-Index/
 - `house-price-data.js`
 - `house-price-data-nbs-70.js`
 
-## 10. 常见问题
+## 11. 常见问题
 
 ### Q1. 页面一直停留在“正在加载数据...”
 
@@ -174,7 +195,7 @@ Centaline-Leading-Index/
 - 先点击“一键生成”再导出
 - 导出基于当前页面状态（区间、城市、分析开关）
 
-## 11. 合规说明
+## 12. 合规说明
 
 - 数据源可能涉及授权与使用限制，请在合法范围内获取和使用。
 - 本项目默认用于研究、分析与交流场景，对外发布请遵守数据源与平台规则。

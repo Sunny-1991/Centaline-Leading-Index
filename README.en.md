@@ -126,7 +126,28 @@ Outputs:
 - Fetch scripts require working network access (`curl` / `fetch`)
 - Node.js 18+ recommended
 
-## 8. Project Structure
+## 8. Automatic Monthly NBS Updates
+
+The repository includes a built-in GitHub Actions workflow for monthly NBS updates:
+
+- Workflow file: `.github/workflows/auto-update-nbs-data.yml`
+- Triggers:
+  - Monthly scheduled run (UTC)
+  - Manual run from GitHub Actions (`workflow_dispatch`)
+- Behavior:
+  - Runs `node scripts/fetch-nbs-70city-secondhand.mjs`
+  - Commits and pushes only when `house-price-data-nbs-70.js` or `house-price-data-nbs-70.json` actually changes
+
+The script now auto-truncates the timeline to the latest month available from the NBS API (no hard-coded end month).
+This automation is only for NBS data; paid Centaline data should continue to be updated manually.
+
+Optional environment variables (advanced usage):
+
+- `NBS_OUTPUT_MIN_MONTH` (default: `2008-01`)
+- `NBS_OUTPUT_BASE_MONTH` (default: `2008-01`)
+- `NBS_OUTPUT_MAX_MONTH` (default: current UTC month; final output uses the earlier one between this value and API latest month)
+
+## 9. Project Structure
 
 ```text
 Centaline-Leading-Index/
@@ -145,7 +166,7 @@ Centaline-Leading-Index/
 └── README.en.md
 ```
 
-## 9. Deploy to GitHub Pages
+## 10. Deploy to GitHub Pages
 
 This is a static site. Push to `main` branch and ensure these files are accessible at repo root:
 
@@ -155,7 +176,7 @@ This is a static site. Push to `main` branch and ensure these files are accessib
 - `house-price-data.js`
 - `house-price-data-nbs-70.js`
 
-## 10. FAQ
+## 11. FAQ
 
 ### Q1. Page keeps showing "Loading..."
 
@@ -172,7 +193,7 @@ This is a static site. Push to `main` branch and ensure these files are accessib
 - Click "Generate" before export
 - Export follows current chart state (range, selected cities, toggles)
 
-## 11. Compliance Note
+## 12. Compliance Note
 
 - Data sources may be subject to authorization constraints.
 - Use within legal scope and comply with source/platform policies when publishing.

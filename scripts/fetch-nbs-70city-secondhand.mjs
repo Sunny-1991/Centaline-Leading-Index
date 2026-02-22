@@ -7,9 +7,8 @@ import { fileURLToPath } from "node:url";
 const API_URL = "https://data.stats.gov.cn/easyquery.htm";
 const DB_CODE = "csyd";
 const INDICATOR_ID = "A010807";
-const OUTPUT_MIN_MONTH = "2008-01";
-const OUTPUT_MAX_MONTH = "2026-01";
-const OUTPUT_BASE_MONTH = "2008-01";
+const DEFAULT_OUTPUT_MIN_MONTH = "2008-01";
+const DEFAULT_OUTPUT_BASE_MONTH = "2008-01";
 const REQUEST_TIMEOUT_MS = 20000;
 const MAX_RETRIES = 5;
 
@@ -30,6 +29,26 @@ function codeToMonth(code) {
   const text = String(code || "");
   if (!/^\d{6}$/.test(text)) return "";
   return `${text.slice(0, 4)}-${text.slice(4, 6)}`;
+}
+
+function normalizeMonthToken(value) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  if (/^\d{4}-\d{2}$/.test(text)) return text;
+  const match = text.match(/^(\d{4})[-/](\d{1,2})$/);
+  if (!match) return "";
+  return `${match[1]}-${String(Number(match[2])).padStart(2, "0")}`;
+}
+
+function formatCurrentMonthUTC() {
+  const now = new Date();
+  const year = now.getUTCFullYear();
+  const month = String(now.getUTCMonth() + 1).padStart(2, "0");
+  return `${year}-${month}`;
+}
+
+function minMonth(a, b) {
+  return a <= b ? a : b;
 }
 
 function enumerateMonths(startMonth, endMonth) {
@@ -164,16 +183,25 @@ async function main() {
   const __dirname = path.dirname(__filename);
 
   const outputPath = process.argv[2] || path.resolve(__dirname, "..", "house-price-data-nbs-70.js");
+  const outputMinMonth =
+    normalizeMonthToken(process.env.NBS_OUTPUT_MIN_MONTH) || DEFAULT_OUTPUT_MIN_MONTH;
+  const outputBaseMonth =
+    normalizeMonthToken(process.env.NBS_OUTPUT_BASE_MONTH) || DEFAULT_OUTPUT_BASE_MONTH;
+  const requestedMaxMonth =
+    normalizeMonthToken(process.env.NBS_OUTPUT_MAX_MONTH) || formatCurrentMonthUTC();
   const outputJsonPath = outputPath.replace(/\.js$/i, ".json");
-  const months = enumerateMonths(OUTPUT_MIN_MONTH, OUTPUT_MAX_MONTH);
-  const baseMonthIndex = months.indexOf(OUTPUT_BASE_MONTH);
-
-  if (baseMonthIndex < 0) {
-    throw new Error(`Cannot locate base month ${OUTPUT_BASE_MONTH}.`);
+  if (!outputMinMonth || !outputBaseMonth || !requestedMaxMonth) {
+    throw new Error("Invalid month settings. Expected YYYY-MM format.");
+  }
+  if (outputMinMonth > requestedMaxMonth) {
+    throw new Error(`NBS_OUTPUT_MIN_MONTH (${outputMinMonth}) cannot be later than max month (${requestedMaxMonth}).`);
+  }
+  if (outputBaseMonth < outputMinMonth || outputBaseMonth > requestedMaxMonth) {
+    throw new Error(`NBS_OUTPUT_BASE_MONTH (${outputBaseMonth}) must be within [${outputMinMonth}, ${requestedMaxMonth}].`);
   }
 
-  const startYear = Number(OUTPUT_MIN_MONTH.slice(0, 4));
-  const endYear = Number(OUTPUT_MAX_MONTH.slice(0, 4));
+  const startYear = Number(outputMinMonth.slice(0, 4));
+  const endYear = Number(requestedMaxMonth.slice(0, 4));
 
   const cityOrder = [];
   const cityNameByCode = new Map();
@@ -204,7 +232,7 @@ async function main() {
       if (!regCode || EXCLUDED_REG_CODES.has(regCode) || !sjCode) return;
 
       const month = codeToMonth(sjCode);
-      if (!month || month < OUTPUT_MIN_MONTH || month > OUTPUT_MAX_MONTH) return;
+      if (!month || month < outputMinMonth || month > requestedMaxMonth) return;
 
       const value = parseNodeValue(node);
       if (!isFiniteNumber(value)) return;
@@ -219,6 +247,17 @@ async function main() {
     });
 
     await sleep(120);
+  }
+
+  if (!latestMonthFromApi) {
+    throw new Error("Cannot determine latest month from NBS API.");
+  }
+
+  const outputMaxMonth = minMonth(requestedMaxMonth, latestMonthFromApi);
+  const months = enumerateMonths(outputMinMonth, outputMaxMonth);
+  const baseMonthIndex = months.indexOf(outputBaseMonth);
+  if (baseMonthIndex < 0) {
+    throw new Error(`Cannot locate base month ${outputBaseMonth} in generated timeline.`);
   }
 
   const values = {};
@@ -255,8 +294,8 @@ async function main() {
       availableRange: buildAvailableRange(chainedSeries, months),
       source: "国家统计局(data.stats.gov.cn)",
       frequency: "月",
-      updatedAt: latestMonthFromApi || OUTPUT_MAX_MONTH,
-      rebaseBaseMonth: OUTPUT_BASE_MONTH,
+      updatedAt: latestMonthFromApi || outputMaxMonth,
+      rebaseBaseMonth: outputBaseMonth,
       rebaseBaseValue: 100,
       regCode,
       chainedFrom: "上月=100",
@@ -265,9 +304,8 @@ async function main() {
 
   const outputData = {
     sourceFile: `${API_URL} (${DB_CODE}/${INDICATOR_ID})`,
-    generatedAt: new Date().toISOString(),
     sheetName: "NBS_70city_secondhand",
-    baseMonth: OUTPUT_BASE_MONTH,
+    baseMonth: outputBaseMonth,
     rowsParsed: months.length,
     dates: months,
     cities,
@@ -276,6 +314,8 @@ async function main() {
     indicatorId: INDICATOR_ID,
     dbcode: DB_CODE,
     cityCount: cities.length,
+    requestedMaxMonth,
+    outputMaxMonth,
     latestMonthFromApi,
     excludedRegCodes: [...EXCLUDED_REG_CODES],
   };
