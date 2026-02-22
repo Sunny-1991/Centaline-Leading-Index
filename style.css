@@ -211,6 +211,26 @@ button:hover {
   padding-right: 3px;
 }
 
+.city-list.city-list--three-cols {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  column-gap: 8px;
+  row-gap: 5px;
+  max-height: 280px;
+  align-content: start;
+}
+
+.city-list.city-list--three-cols .city-item {
+  gap: 5px;
+  padding: 1px 0;
+  font-size: 0.86rem;
+  white-space: nowrap;
+}
+
+.city-list.city-list--three-cols .city-item span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .city-list::-webkit-scrollbar {
   width: 8px;
 }
@@ -941,6 +961,10 @@ body.theme-stripe-dark .chart-stats-source-tag {
 
   .city-list {
     max-height: 170px;
+  }
+
+  .city-list.city-list--three-cols {
+    max-height: 220px;
   }
 
   .chart-stats-overlay th,

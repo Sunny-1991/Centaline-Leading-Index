@@ -43,6 +43,7 @@ const chartStatsOverlayEl = document.getElementById("chartStatsOverlay");
 const chartEl = document.getElementById("chart");
 const chartStageEl = chartEl ? chartEl.closest(".chart-stage") : null;
 const sourceSubtitleEl = document.getElementById("sourceSubtitleText");
+const CITY_LIST_THREE_COLS_CLASS = "city-list--three-cols";
 
 const chart = echarts.init(chartEl, null, {
   renderer: "canvas",
@@ -352,6 +353,7 @@ function applyDataSource(sourceKey) {
   if (dataSourceEl && dataSourceEl.value !== source.key) {
     dataSourceEl.value = source.key;
   }
+  cityListEl.classList.toggle(CITY_LIST_THREE_COLS_CLASS, source.key === "nbs70");
 
   uiState.hiddenCityNames.clear();
   uiState.zoomStartMonth = null;
