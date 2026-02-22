@@ -119,6 +119,7 @@ body.theme-stripe-dark {
   display: grid;
   grid-template-columns: 320px minmax(760px, 1fr);
   gap: 16px;
+  align-items: start;
 }
 
 .controls,
@@ -368,6 +369,7 @@ select:focus {
   display: grid;
   gap: 9px;
   font-family: var(--ui-font);
+  align-self: start;
 }
 
 .chart-head h2 {
