@@ -230,6 +230,79 @@ function formatMonthZh(month) {
   return `${year}年${Number(m)}月`;
 }
 
+function formatOverlayRangeLabel(startMonth, endMonth) {
+  return `${formatMonthZh(startMonth)}－${formatMonthZh(endMonth)}`;
+}
+
+function formatOverlayBaseLabel(baseMonth) {
+  return `定基${formatMonthZh(baseMonth)}＝100`;
+}
+
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (char) => {
+    if (char === "&") return "&amp;";
+    if (char === "<") return "&lt;";
+    if (char === ">") return "&gt;";
+    if (char === '"') return "&quot;";
+    return "&#39;";
+  });
+}
+
+function getOverlayMonthTextSegments(month) {
+  const normalized = normalizeMonthToken(month);
+  const matched = normalized.match(/^(\d{4})-(\d{2})$/);
+  if (!matched) {
+    return [
+      {
+        text: formatMonthZh(month),
+        isDigit: false,
+      },
+    ];
+  }
+  const monthNumber = String(Number(matched[2]));
+  return [
+    { text: matched[1], isDigit: true },
+    { text: "年", isDigit: false },
+    { text: monthNumber, isDigit: true },
+    { text: "月", isDigit: false },
+  ];
+}
+
+function renderOverlayTextSegmentsHtml(segments) {
+  return segments
+    .map((segment) => {
+      const text = escapeHtml(segment.text);
+      if (!segment.isDigit) return text;
+      return `<span class="chart-stats-digit">${text}</span>`;
+    })
+    .join("");
+}
+
+function buildOverlayRangeHtml(startMonth, endMonth) {
+  const startHtml = renderOverlayTextSegmentsHtml(getOverlayMonthTextSegments(startMonth));
+  const endHtml = renderOverlayTextSegmentsHtml(getOverlayMonthTextSegments(endMonth));
+  return `${startHtml}<span class="chart-stats-range-sep">－</span>${endHtml}`;
+}
+
+function buildOverlayBaseValueHtml(baseMonth) {
+  const monthHtml = renderOverlayTextSegmentsHtml(getOverlayMonthTextSegments(baseMonth));
+  return `${monthHtml}<span class="chart-stats-base-eq">＝</span><span class="chart-stats-digit">100</span>`;
+}
+
+function measureOverlayTextSegments(ctx, segments) {
+  return segments.reduce((width, segment) => width + ctx.measureText(segment.text).width, 0);
+}
+
+function drawOverlayTextSegments(ctx, startX, y, segments, digitOffsetY = 0) {
+  let cursorX = startX;
+  for (const segment of segments) {
+    const drawY = segment.isDigit ? y + digitOffsetY : y;
+    ctx.fillText(segment.text, cursorX, drawY);
+    cursorX += ctx.measureText(segment.text).width;
+  }
+  return cursorX - startX;
+}
+
 function formatMonthDot(month) {
   const token = normalizeMonthToken(month);
   if (!token) return "";
@@ -1455,6 +1528,10 @@ function renderChartStatsOverlay(rows, startMonth, endMonth) {
   }
 
   const { isCrossSource, headerLabel, sourceNoteText } = resolveOverlayPresentation(rows);
+  const rangeLabel = formatOverlayRangeLabel(startMonth, endMonth);
+  const rangeHtml = buildOverlayRangeHtml(startMonth, endMonth);
+  const baseLabel = formatOverlayBaseLabel(startMonth);
+  const baseValueHtml = buildOverlayBaseValueHtml(startMonth);
 
   const orderedRows = [...rows].sort((a, b) => {
     const aCityName = String(a.cityName || a.name || "");
@@ -1492,17 +1569,19 @@ function renderChartStatsOverlay(rows, startMonth, endMonth) {
 
   chartStatsOverlayEl.innerHTML = `
     <div class="chart-stats-title-main">二手住宅价格指数：热点城市</div>
-    <div class="chart-stats-title-sub">${formatMonthZh(startMonth)} - ${formatMonthZh(endMonth)}</div>
-    <div class="chart-stats-title-sub chart-stats-title-base">定基${formatMonthZh(startMonth)} = 100</div>
+    <div class="chart-stats-title-sub chart-stats-title-range" aria-label="${rangeLabel}">${rangeHtml}</div>
+    <div class="chart-stats-title-sub chart-stats-title-base" aria-label="${baseLabel}">
+      <span class="chart-stats-base-prefix">定基</span><span class="chart-stats-base-value">${baseValueHtml}</span>
+    </div>
     <table>
     ${colGroupHtml}
     <thead>
       <tr>
-        <th>${headerLabel}</th>
-        <th>最高位置</th>
-        <th>当前位置</th>
-        <th>累计跌幅</th>
-        <th>跌回</th>
+        <th><span class="chart-stats-th-text">${headerLabel}</span></th>
+        <th><span class="chart-stats-th-text">最高位置</span></th>
+        <th><span class="chart-stats-th-text">当前位置</span></th>
+        <th><span class="chart-stats-th-text">累计跌幅</span></th>
+        <th><span class="chart-stats-th-text">跌回</span></th>
       </tr>
     </thead>
     <tbody>${bodyRows}</tbody>
@@ -1619,6 +1698,13 @@ function drawOverlaySummaryOnCanvas(ctx, canvasWidth, canvasHeight, exportContex
   if (rows.length === 0) return;
 
   const { isCrossSource, headerLabel, sourceNoteText } = resolveOverlayPresentation(rows);
+  const rangeStartSegments = getOverlayMonthTextSegments(exportContext.startMonth);
+  const rangeEndSegments = getOverlayMonthTextSegments(exportContext.endMonth);
+  const baseValueSegments = [
+    ...getOverlayMonthTextSegments(exportContext.startMonth),
+    { text: "＝", isDigit: false },
+    { text: "100", isDigit: true },
+  ];
 
   const orderedRows = [...rows].sort((a, b) => {
     const aCityName = String(a.cityName || a.name || "");
@@ -1669,13 +1755,35 @@ function drawOverlaySummaryOnCanvas(ctx, canvasWidth, canvasHeight, exportContex
   cursorY += Math.round(mainFontSize * 1.24);
 
   ctx.font = `400 ${subFontSize}px ${fontFamily}`;
-  ctx.fillText(
-    `${formatMonthZh(exportContext.startMonth)} - ${formatMonthZh(exportContext.endMonth)}`,
-    centerX,
+  const digitDropY = Math.max(0.5, subFontSize * 0.05);
+  const rangeSeparator = "－";
+  const rangeSeparatorWidth = ctx.measureText(rangeSeparator).width;
+  const rangeStartWidth = measureOverlayTextSegments(ctx, rangeStartSegments);
+  const rangeEndWidth = measureOverlayTextSegments(ctx, rangeEndSegments);
+  const rangeTotalWidth = rangeStartWidth + rangeSeparatorWidth + rangeEndWidth;
+  let rangeCursorX = centerX - rangeTotalWidth / 2;
+  ctx.textAlign = "left";
+  rangeCursorX += drawOverlayTextSegments(
+    ctx,
+    rangeCursorX,
     cursorY,
+    rangeStartSegments,
+    digitDropY,
   );
+  ctx.fillText(rangeSeparator, rangeCursorX, cursorY);
+  rangeCursorX += rangeSeparatorWidth;
+  drawOverlayTextSegments(ctx, rangeCursorX, cursorY, rangeEndSegments, digitDropY);
+  ctx.textAlign = "center";
   cursorY += Math.round(subFontSize * 1.24);
-  ctx.fillText(`定基${formatMonthZh(exportContext.startMonth)} = 100`, centerX, cursorY);
+  ctx.textAlign = "left";
+  const basePrefix = "定基";
+  const prefixWidth = ctx.measureText(basePrefix).width;
+  const valueWidth = measureOverlayTextSegments(ctx, baseValueSegments);
+  const baseStartX = centerX - (prefixWidth + valueWidth) / 2;
+  const prefixNudgeY = -(subFontSize * 0.04);
+  ctx.fillText(basePrefix, baseStartX, cursorY + prefixNudgeY);
+  drawOverlayTextSegments(ctx, baseStartX + prefixWidth, cursorY, baseValueSegments, digitDropY);
+  ctx.textAlign = "center";
   cursorY += Math.round(subFontSize * 1.2);
 
   const header = [headerLabel, "最高位置", "当前位置", "累计跌幅", "跌回"];
@@ -1700,12 +1808,15 @@ function drawOverlaySummaryOnCanvas(ctx, canvasWidth, canvasHeight, exportContex
 
   ctx.font = `700 ${cellFontSize}px ${fontFamily}`;
   ctx.fillStyle = chartTheme.overlayTextColor;
+  ctx.textBaseline = "middle";
   let runningX = tableX;
+  const headerTextY = topY + headerHeight / 2 - Math.max(0.5, cellFontSize * 0.05);
   for (let i = 0; i < header.length; i += 1) {
     const midX = runningX + colWidths[i] / 2;
-    ctx.fillText(header[i], midX, topY + Math.round((headerHeight - cellFontSize) / 2) - 1);
+    ctx.fillText(header[i], midX, headerTextY);
     runningX += colWidths[i];
   }
+  ctx.textBaseline = "top";
 
   ctx.font = `400 ${cellFontSize}px ${fontFamily}`;
   orderedRows.forEach((row, index) => {

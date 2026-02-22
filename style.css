@@ -541,6 +541,8 @@ select:focus {
 }
 
 .chart-stats-overlay {
+  --stats-cell-pad-y: 2px;
+  --stats-cell-pad-x: 5.3px;
   position: absolute;
   top: 38px;
   left: 142px;
@@ -582,7 +584,7 @@ select:focus {
   line-height: 1.2;
   color: #1f252a;
   border-bottom: none;
-  padding: 2px 5.3px;
+  padding: var(--stats-cell-pad-y) var(--stats-cell-pad-x);
   text-align: center;
   background: transparent;
 }
@@ -605,6 +607,8 @@ select:focus {
 .chart-stats-overlay th {
   font-weight: 700;
   border-bottom: 1px solid #6f747a;
+  padding-top: 0;
+  padding-bottom: 0;
 }
 
 .chart-stats-overlay thead th {
@@ -612,6 +616,15 @@ select:focus {
   top: auto;
   background: transparent;
   color: #1f252a;
+}
+
+.chart-stats-th-text {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: calc(1.2em + (var(--stats-cell-pad-y) * 2));
+  line-height: 1;
+  transform: translateY(-0.045em);
 }
 
 .chart-stats-title-main {
@@ -633,14 +646,51 @@ select:focus {
   font-family: var(--chart-font);
   font-size: 0.8rem;
   line-height: 1.12;
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: "tnum" 1, "lnum" 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   color: #22282d;
   margin-top: 1px;
   text-align: center;
 }
 
+.chart-stats-title-range {
+  gap: 0;
+  white-space: nowrap;
+}
+
+.chart-stats-range-sep {
+  display: inline-block;
+}
+
+.chart-stats-digit {
+  display: inline-block;
+  transform: translateY(0.045em);
+}
+
 .chart-stats-title-base,
 .chart-stats-overlay > .chart-stats-title-sub:nth-of-type(3) {
   margin-bottom: 4px;
+}
+
+.chart-stats-title-base {
+  gap: 0;
+  white-space: nowrap;
+}
+
+.chart-stats-base-prefix {
+  display: inline-block;
+  transform: translateY(-0.04em);
+}
+
+.chart-stats-base-value {
+  display: inline-block;
+}
+
+.chart-stats-base-eq {
+  display: inline-block;
 }
 
 .chart-stats-note {
@@ -766,13 +816,14 @@ thead th {
     top: 24px;
     max-width: calc(100% - 24px);
     min-width: 0;
+    --stats-cell-pad-y: 3px;
+    --stats-cell-pad-x: 4px;
     padding: 0;
   }
 
   .chart-stats-overlay th,
   .chart-stats-overlay td {
     font-size: 0.8rem;
-    padding: 3px 4px;
   }
 
   .chart-stats-title-main {
@@ -959,11 +1010,12 @@ thead th {
   .chart-stats-overlay th,
   .chart-stats-overlay td {
     font-size: 0.72rem;
-    padding: 2px 3px;
   }
 
   .chart-stats-overlay {
     min-width: 220px;
+    --stats-cell-pad-y: 2px;
+    --stats-cell-pad-x: 3px;
   }
 
   .chart-stats-overlay table {
