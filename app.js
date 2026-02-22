@@ -6,6 +6,7 @@ const SOURCE_CONFIGS = [
     key: "centaline6",
     label: "中原领先指数（6城）",
     legendLabel: "中原",
+    metaLabel: "中原6城",
     sourceTitle: "中原领先指数（月度）",
     heroSubtitle: "数据来源：Wind、中原研究中心",
     defaultSelectedNames: null,
@@ -15,6 +16,7 @@ const SOURCE_CONFIGS = [
     key: "nbs70",
     label: "国家统计局（二手住宅70城）",
     legendLabel: "统计局",
+    metaLabel: "统计局70城",
     sourceTitle: "国家统计局70城二手住宅销售价格指数（上月=100，链式定基）",
     heroSubtitle: "数据来源：国家统计局（70城二手住宅销售价格指数）",
     defaultSelectedNames: ["北京", "上海", "广州", "深圳", "天津", "重庆"],
@@ -3354,12 +3356,15 @@ function render() {
   chart.dispatchAction({ type: "hideTip" });
   chart.dispatchAction({ type: "updateAxisPointer", currTrigger: "leave" });
   chartTitleEl.textContent = `热点城市二手房价格走势图`;
-  const sourceLabelShort = activeSourceMeta?.label || "中原领先指数（6城）";
+  const sourceLabelShort =
+    activeSourceMeta?.metaLabel || activeSourceMeta?.legendLabel || activeSourceMeta?.label || "中原6城";
   const compareMetaText =
     compareContext && compareSeriesRendered
       ? ` | 对比 ${compareContext.cityName}（${activeSourceLegend} vs ${compareSourceLegend}）`
       : "";
-  chartMetaEl.textContent = `${formatMonthZh(viewportStartMonth)} - ${formatMonthZh(viewportEndMonth)} | 定基 ${formatMonthZh(viewportStartMonth)} = 100 | ${sourceLabelShort}${compareMetaText}`;
+  const chartMetaText = `${formatMonthZh(viewportStartMonth)} - ${formatMonthZh(viewportEndMonth)} | 定基 ${formatMonthZh(viewportStartMonth)} = 100 | ${sourceLabelShort}${compareMetaText}`;
+  chartMetaEl.textContent = chartMetaText;
+  chartMetaEl.title = chartMetaText;
 
   renderSummaryTable(visibleSummaryRows);
   renderChartStatsOverlay(visibleSummaryRows, viewportStartMonth, viewportEndMonth);

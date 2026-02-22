@@ -383,6 +383,12 @@ select:focus {
   color: var(--soft);
   font-size: 0.88rem;
   font-family: var(--ui-font);
+  width: 100%;
+  max-width: 100%;
+  min-height: 1.38em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .chart-head {
