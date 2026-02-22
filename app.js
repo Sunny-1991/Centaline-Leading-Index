@@ -1551,13 +1551,49 @@ function resolveExportRenderLayout(option = {}, pixelRatio = 2) {
   const legendBottom = Number.isFinite(Number(legendBottomRaw))
     ? Number(legendBottomRaw)
     : 10;
+  const isLightMode = getSafeThemeMode(uiState.themeMode) === THEME_MODE_LIGHT;
+  const exportEdgeTrimPx = isLightMode ? Math.max(1, Math.round(pixelRatio * 1.1)) : 0;
   return {
     gridBottom,
     legendBottom,
     exportGridBottom: Math.max(38, gridBottom - 74),
     exportLegendBottom: clampNumber(legendBottom + 24, legendBottom, 44),
     exportTrimBottomPx: Math.max(10, Math.round(14 * pixelRatio)),
+    exportTrimTopPx: exportEdgeTrimPx,
+    exportTrimLeftPx: exportEdgeTrimPx,
+    exportTrimRightPx: exportEdgeTrimPx,
   };
+}
+
+function trimCanvasByInsets(canvas, { top = 0, right = 0, bottom = 0, left = 0 } = {}) {
+  if (!canvas) return canvas;
+  const safeTop = Math.max(0, Math.round(top));
+  const safeRight = Math.max(0, Math.round(right));
+  const safeBottom = Math.max(0, Math.round(bottom));
+  const safeLeft = Math.max(0, Math.round(left));
+  const sourceWidth = canvas.width;
+  const sourceHeight = canvas.height;
+  const targetWidth = sourceWidth - safeLeft - safeRight;
+  const targetHeight = sourceHeight - safeTop - safeBottom;
+  if (targetWidth <= 1 || targetHeight <= 1) return canvas;
+
+  const trimmedCanvas = document.createElement("canvas");
+  trimmedCanvas.width = targetWidth;
+  trimmedCanvas.height = targetHeight;
+  const trimmedCtx = trimmedCanvas.getContext("2d");
+  if (!trimmedCtx) return canvas;
+  trimmedCtx.drawImage(
+    canvas,
+    safeLeft,
+    safeTop,
+    targetWidth,
+    targetHeight,
+    0,
+    0,
+    targetWidth,
+    targetHeight,
+  );
+  return trimmedCanvas;
 }
 
 async function captureChartStageSnapshot(pixelRatio = 2) {
@@ -1630,27 +1666,12 @@ async function captureChartStageSnapshot(pixelRatio = 2) {
 
   if (!stageCanvas) return null;
 
-  let outputCanvas = stageCanvas;
-  if (stageCanvas.height > exportLayout.exportTrimBottomPx + 1) {
-    const trimmedCanvas = document.createElement("canvas");
-    trimmedCanvas.width = stageCanvas.width;
-    trimmedCanvas.height = stageCanvas.height - exportLayout.exportTrimBottomPx;
-    const trimmedCtx = trimmedCanvas.getContext("2d");
-    if (trimmedCtx) {
-      trimmedCtx.drawImage(
-        stageCanvas,
-        0,
-        0,
-        stageCanvas.width,
-        trimmedCanvas.height,
-        0,
-        0,
-        trimmedCanvas.width,
-        trimmedCanvas.height,
-      );
-      outputCanvas = trimmedCanvas;
-    }
-  }
+  const outputCanvas = trimCanvasByInsets(stageCanvas, {
+    top: exportLayout.exportTrimTopPx,
+    right: exportLayout.exportTrimRightPx,
+    bottom: exportLayout.exportTrimBottomPx,
+    left: exportLayout.exportTrimLeftPx,
+  });
 
   return {
     dataURL: outputCanvas.toDataURL("image/png"),
@@ -1921,28 +1942,12 @@ async function exportCurrentChartImage(pixelRatio = 2, label = "标准清晰") {
   ctx.drawImage(chartImage, 0, 0);
   drawOverlaySummaryOnCanvas(ctx, canvas.width, canvas.height, latestRenderContext);
 
-  let outputCanvas = canvas;
-  const fallbackTrimBottomPx = exportLayout.exportTrimBottomPx;
-  if (canvas.height > fallbackTrimBottomPx + 1) {
-    const trimmedCanvas = document.createElement("canvas");
-    trimmedCanvas.width = canvas.width;
-    trimmedCanvas.height = canvas.height - fallbackTrimBottomPx;
-    const trimmedCtx = trimmedCanvas.getContext("2d");
-    if (trimmedCtx) {
-      trimmedCtx.drawImage(
-        canvas,
-        0,
-        0,
-        canvas.width,
-        trimmedCanvas.height,
-        0,
-        0,
-        trimmedCanvas.width,
-        trimmedCanvas.height,
-      );
-      outputCanvas = trimmedCanvas;
-    }
-  }
+  const outputCanvas = trimCanvasByInsets(canvas, {
+    top: exportLayout.exportTrimTopPx,
+    right: exportLayout.exportTrimRightPx,
+    bottom: exportLayout.exportTrimBottomPx,
+    left: exportLayout.exportTrimLeftPx,
+  });
 
   const suffix = pixelRatio >= 4 ? "-ultra-hd" : "";
   const filename = `house-price-base100-${latestRenderContext.startMonth}-to-${latestRenderContext.endMonth}${suffix}.png`;
