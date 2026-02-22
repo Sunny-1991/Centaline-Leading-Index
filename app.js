@@ -620,30 +620,72 @@ function getZoomPayload(event) {
   return null;
 }
 
-function resolveResponsiveChartLayout(chartWidth) {
-  if (chartWidth <= 520) {
+function isTouchPortraitViewport() {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") return false;
+  return window.matchMedia("(hover: none) and (pointer: coarse) and (orientation: portrait)").matches;
+}
+
+function getResponsiveChartWidth(chartWidth) {
+  if (isTouchPortraitViewport()) {
+    return Math.min(chartWidth, 760);
+  }
+  return chartWidth;
+}
+
+function resolveChartGridLayout(chartWidth) {
+  const responsiveWidth = getResponsiveChartWidth(chartWidth);
+  if (responsiveWidth <= 520) {
     return {
-      aspectRatio: 1.02,
-      minHeight: 360,
-      maxHeight: 680,
-      overlayScaleMin: 0.4,
-      overlayScaleMax: 0.8,
-      overlayLeftRatio: 0.21,
-      overlayTopRatio: 0.042,
+      left: 52,
+      right: 34,
+      top: 36,
+      bottom: 92,
     };
   }
-  if (chartWidth <= 760) {
+  if (responsiveWidth <= 760) {
     return {
-      aspectRatio: 0.94,
-      minHeight: 390,
-      maxHeight: 760,
+      left: 60,
+      right: 42,
+      top: 40,
+      bottom: 100,
+    };
+  }
+  if (responsiveWidth <= 1120) {
+    return {
+      left: 66,
+      right: 62,
+      top: 42,
+      bottom: 106,
+    };
+  }
+  return CHART_GRID_LAYOUT;
+}
+
+function resolveResponsiveChartLayout(chartWidth) {
+  const responsiveWidth = getResponsiveChartWidth(chartWidth);
+  if (responsiveWidth <= 520) {
+    return {
+      aspectRatio: 0.88,
+      minHeight: 330,
+      maxHeight: 560,
+      overlayScaleMin: 0.44,
+      overlayScaleMax: 0.8,
+      overlayLeftRatio: 0.185,
+      overlayTopRatio: 0.045,
+    };
+  }
+  if (responsiveWidth <= 760) {
+    return {
+      aspectRatio: 0.84,
+      minHeight: 360,
+      maxHeight: 660,
       overlayScaleMin: 0.46,
       overlayScaleMax: 0.9,
-      overlayLeftRatio: 0.18,
+      overlayLeftRatio: 0.16,
       overlayTopRatio: 0.046,
     };
   }
-  if (chartWidth <= 1120) {
+  if (responsiveWidth <= 1120) {
     return {
       aspectRatio: 0.74,
       minHeight: 420,
@@ -666,6 +708,8 @@ function resolveResponsiveChartLayout(chartWidth) {
 }
 
 function resolveXAxisLabelLayout(months, chartWidth, visibleStartIndex, visibleEndIndex) {
+  const responsiveWidth = getResponsiveChartWidth(chartWidth);
+  const gridLayout = resolveChartGridLayout(chartWidth);
   const safeStart = clampNumber(
     Number.isInteger(visibleStartIndex) ? visibleStartIndex : 0,
     0,
@@ -682,20 +726,25 @@ function resolveXAxisLabelLayout(months, chartWidth, visibleStartIndex, visibleE
   let fontSize = 11.8;
   let margin = 14;
 
-  if (chartWidth <= 520) {
+  if (responsiveWidth <= 520) {
     maxLabels = 5;
     fontSize = 10.1;
     margin = 12;
-  } else if (chartWidth <= 760) {
+  } else if (responsiveWidth <= 760) {
     maxLabels = 7;
     fontSize = 10.8;
     margin = 13;
-  } else if (chartWidth <= 1120) {
+  } else if (responsiveWidth <= 1120) {
     maxLabels = 10;
   }
 
-  const plotWidth = Math.max(220, chartWidth - CHART_GRID_LAYOUT.left - CHART_GRID_LAYOUT.right);
-  const minGapPx = chartWidth <= 520 ? 78 : chartWidth <= 760 ? 90 : 108;
+  const plotWidth = Math.max(220, chartWidth - gridLayout.left - gridLayout.right);
+  const minGapPx =
+    responsiveWidth <= 520
+      ? 72
+      : responsiveWidth <= 760
+        ? 86
+        : 104;
   const maxByGap = Math.max(2, Math.floor(plotWidth / minGapPx) + 1);
   const targetLabelCount = Math.max(2, Math.min(maxLabels, maxByGap, span + 1));
 
@@ -778,6 +827,8 @@ function resolveXAxisLabelLayout(months, chartWidth, visibleStartIndex, visibleE
 function syncChartViewport({ resizeChart = true } = {}) {
   const chartWidth = chartEl.clientWidth;
   if (!chartWidth) return;
+  const responsiveWidth = getResponsiveChartWidth(chartWidth);
+  const gridLayout = resolveChartGridLayout(chartWidth);
   const layout = resolveResponsiveChartLayout(chartWidth);
 
   const chartHeight = Math.round(
@@ -804,8 +855,8 @@ function syncChartViewport({ resizeChart = true } = {}) {
   const scaledOverlayHeight = rawOverlayHeight * overlayScale;
 
   const maxLeft = Math.max(8, chartWidth - scaledOverlayWidth - 8);
-  const overlaySafeGap = chartWidth <= 520 ? 56 : chartWidth <= 760 ? 46 : 18;
-  const requestedMinLeft = CHART_GRID_LAYOUT.left + overlaySafeGap;
+  const overlaySafeGap = responsiveWidth <= 520 ? 36 : responsiveWidth <= 760 ? 30 : 18;
+  const requestedMinLeft = gridLayout.left + overlaySafeGap;
   const minLeft = Math.min(requestedMinLeft, maxLeft);
   const finalLeft =
     scaledOverlayWidth > 0
@@ -2024,11 +2075,12 @@ function resolvePeakLabelLayouts(rendered, months, yMin, yMax, labelGapMonths) {
 
   const chartWidth = chart.getWidth();
   const chartHeight = chart.getHeight();
+  const gridLayout = resolveChartGridLayout(chartWidth);
   const plotBounds = {
-    left: CHART_GRID_LAYOUT.left,
-    right: Math.max(CHART_GRID_LAYOUT.left + 1, chartWidth - CHART_GRID_LAYOUT.right),
-    top: CHART_GRID_LAYOUT.top,
-    bottom: Math.max(CHART_GRID_LAYOUT.top + 1, chartHeight - CHART_GRID_LAYOUT.bottom),
+    left: gridLayout.left,
+    right: Math.max(gridLayout.left + 1, chartWidth - gridLayout.right),
+    top: gridLayout.top,
+    bottom: Math.max(gridLayout.top + 1, chartHeight - gridLayout.bottom),
   };
   const peakLabelBounds = {
     left: 8,
@@ -2348,41 +2400,49 @@ function makeOption(
   const selectedMap = Object.fromEntries(
     rendered.map((item) => [item.name, !hiddenCityNames.has(item.name)]),
   );
+  const chartWidth = chart.getWidth();
+  const chartHeight = chart.getHeight();
+  const responsiveChartWidth = getResponsiveChartWidth(chartWidth);
+  const gridLayout = resolveChartGridLayout(chartWidth);
   const allFiniteValues = rendered.flatMap((item) => item.normalized.filter(isFiniteNumber));
   const yMin = allFiniteValues.length > 0 ? Math.min(...allFiniteValues) : 80;
   const yMax = allFiniteValues.length > 0 ? Math.max(...allFiniteValues) : 120;
   const yRange = Math.max(1, yMax - yMin);
-  const usableChartWidth = Math.max(420, chart.getWidth() - 190);
+  const usableChartWidth = Math.max(
+    220,
+    chartWidth - gridLayout.left - gridLayout.right - (responsiveChartWidth <= 760 ? 12 : 24),
+  );
   const labelGapMonths = Math.max(
     4,
     Math.round((92 * Math.max(1, months.length - 1)) / usableChartWidth),
   );
   const peakLabelLayouts = resolvePeakLabelLayouts(rendered, months, yMin, yMax, labelGapMonths);
-  const chartWidth = chart.getWidth();
-  const chartHeight = chart.getHeight();
   const xAxisLabelLayout = resolveXAxisLabelLayout(
     axisMonths,
     chartWidth,
     visibleStartIndex,
     visibleEndIndex,
   );
-  const endLabelFontSize = chartWidth <= 520 ? 14 : chartWidth <= 760 ? 16 : 18;
-  const legendBaseFontSize = chartWidth <= 520 ? 12.5 : chartWidth <= 760 ? 13.5 : 15;
+  const endLabelFontSize = responsiveChartWidth <= 520 ? 14 : responsiveChartWidth <= 760 ? 16 : 18;
+  const legendBaseFontSize = responsiveChartWidth <= 520 ? 12.5 : responsiveChartWidth <= 760 ? 13.5 : 15;
   const legendFontSize = Number((legendBaseFontSize * 1.05).toFixed(2));
   const xAxisLabelFontSize = Number((xAxisLabelLayout.fontSize * 1.1).toFixed(2));
-  const yAxisLabelFontSize = chartWidth <= 520 ? 12 : chartWidth <= 760 ? 13 : 14;
-  const seriesLineWidth = chartWidth <= 520 ? 1.88 : chartWidth <= 760 ? 2.1 : 3.02;
-  const markLineWidth = chartWidth <= 520 ? 1.15 : chartWidth <= 760 ? 1.32 : 2;
-  const markSymbolSize = chartWidth <= 520 ? 8 : chartWidth <= 760 ? 9 : 10;
-  const sliderBaseHeight = chartWidth <= 520 ? 12 : chartWidth <= 760 ? 13 : 14;
+  const yAxisLabelFontSize = responsiveChartWidth <= 520 ? 12 : responsiveChartWidth <= 760 ? 13 : 14;
+  const seriesLineWidth = responsiveChartWidth <= 520 ? 1.88 : responsiveChartWidth <= 760 ? 2.1 : 3.02;
+  const markLineWidth = responsiveChartWidth <= 520 ? 1.15 : responsiveChartWidth <= 760 ? 1.32 : 2;
+  const markSymbolSize = responsiveChartWidth <= 520 ? 8 : responsiveChartWidth <= 760 ? 9 : 10;
+  const sliderBaseHeight = responsiveChartWidth <= 520 ? 12 : responsiveChartWidth <= 760 ? 13 : 14;
   const sliderHeight = Math.max(10, Math.round(sliderBaseHeight * 1.1));
-  const sliderBottom = Math.max(0, CHART_GRID_LAYOUT.bottom - Math.round(sliderHeight / 2));
-  const legendBottom = Math.max(18, Math.round(sliderBottom - (chartWidth <= 520 ? 62 : 74)));
+  const sliderBottom = Math.max(0, gridLayout.bottom - Math.round(sliderHeight / 2));
+  const legendBottom = Math.max(
+    16,
+    Math.round(sliderBottom - (responsiveChartWidth <= 520 ? 58 : responsiveChartWidth <= 760 ? 66 : 74)),
+  );
   const plotBounds = {
-    left: CHART_GRID_LAYOUT.left,
-    right: Math.max(CHART_GRID_LAYOUT.left + 1, chartWidth - CHART_GRID_LAYOUT.right),
-    top: CHART_GRID_LAYOUT.top,
-    bottom: Math.max(CHART_GRID_LAYOUT.top + 1, chartHeight - CHART_GRID_LAYOUT.bottom),
+    left: gridLayout.left,
+    right: Math.max(gridLayout.left + 1, chartWidth - gridLayout.right),
+    top: gridLayout.top,
+    bottom: Math.max(gridLayout.top + 1, chartHeight - gridLayout.bottom),
   };
   const plotWidth = Math.max(1, plotBounds.right - plotBounds.left);
   const plotHeight = Math.max(1, plotBounds.bottom - plotBounds.top);
@@ -2502,10 +2562,10 @@ function makeOption(
       },
     },
     grid: {
-      left: CHART_GRID_LAYOUT.left,
-      right: CHART_GRID_LAYOUT.right,
-      top: CHART_GRID_LAYOUT.top,
-      bottom: CHART_GRID_LAYOUT.bottom,
+      left: gridLayout.left,
+      right: gridLayout.right,
+      top: gridLayout.top,
+      bottom: gridLayout.bottom,
     },
     dataZoom: [
       {
@@ -2568,10 +2628,10 @@ function makeOption(
       boundaryGap: false,
       data: axisMonths,
       axisTick: {
-        show: chartWidth > 760,
+        show: responsiveChartWidth > 760,
         alignWithLabel: true,
         interval: 0,
-        length: chartWidth <= 520 ? 4 : 5,
+        length: responsiveChartWidth <= 520 ? 4 : 5,
       },
       axisLine: { lineStyle: { color: chartTheme.xAxisLineColor } },
       axisLabel: {

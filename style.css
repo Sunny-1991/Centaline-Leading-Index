@@ -28,6 +28,7 @@
 body {
   margin: 0;
   min-height: 100vh;
+  overflow-x: hidden;
   font-family: var(--ui-font);
   line-height: 1.55;
   color: var(--text);
@@ -243,8 +244,13 @@ body.theme-dark .city-list::-webkit-scrollbar-thumb {
 
 .workspace {
   display: grid;
-  grid-template-columns: 320px minmax(760px, 1fr);
+  grid-template-columns: minmax(280px, 320px) minmax(0, 1fr);
   gap: 16px;
+  align-items: start;
+}
+
+.workspace > * {
+  min-width: 0;
 }
 
 .controls,
@@ -529,7 +535,7 @@ select:focus {
 
 .chart {
   width: 100%;
-  height: 860px;
+  height: clamp(330px, 62vh, 860px);
   border: none;
   border-radius: 14px;
   background: linear-gradient(180deg, #fbfeff, #f2f9ff);
@@ -775,7 +781,7 @@ thead th {
   padding: 2px 2px 0;
 }
 
-@media (max-width: 1120px) {
+@media (max-width: 1120px), (hover: none) and (pointer: coarse) and (orientation: portrait) {
   .workspace {
     grid-template-columns: 1fr;
     gap: 12px;
@@ -844,7 +850,7 @@ thead th {
   }
 }
 
-@media (max-width: 760px) {
+@media (max-width: 760px), (hover: none) and (pointer: coarse) and (orientation: portrait) {
   .page {
     width: min(98vw, 100%);
     margin: 14px auto 18px;
@@ -864,6 +870,7 @@ thead th {
   .controls {
     display: flex;
     flex-direction: column;
+    align-items: stretch;
     padding: 12px;
     gap: 10px;
   }
