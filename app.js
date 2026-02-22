@@ -43,6 +43,7 @@ const chartStatsOverlayEl = document.getElementById("chartStatsOverlay");
 const chartEl = document.getElementById("chart");
 const chartStageEl = chartEl ? chartEl.closest(".chart-stage") : null;
 const sourceSubtitleEl = document.getElementById("sourceSubtitleText");
+const cityBlockTitleEl = document.getElementById("cityBlockTitle");
 const CITY_LIST_THREE_COLS_CLASS = "city-list--three-cols";
 
 const chart = echarts.init(chartEl, null, {
@@ -352,6 +353,10 @@ function applyDataSource(sourceKey) {
   }
   if (dataSourceEl && dataSourceEl.value !== source.key) {
     dataSourceEl.value = source.key;
+  }
+  if (cityBlockTitleEl) {
+    cityBlockTitleEl.textContent =
+      source.key === "centaline6" ? "城市" : "城市（可选多至6个）";
   }
   cityListEl.classList.toggle(CITY_LIST_THREE_COLS_CLASS, source.key === "nbs70");
   const canUseSelectAll = source.key !== "nbs70";
