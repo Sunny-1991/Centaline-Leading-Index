@@ -253,6 +253,37 @@ body.theme-dark .city-list::-webkit-scrollbar-thumb {
   min-width: 0;
 }
 
+body.mobile-portrait-ui .workspace {
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+body.mobile-portrait-ui .chart-zone {
+  order: 1;
+}
+
+body.mobile-portrait-ui .controls {
+  order: 2;
+  position: static;
+  top: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+body.mobile-portrait-ui .controls.controls-collapsed .control-block:not(.actions) {
+  display: none;
+}
+
+body.mobile-portrait-ui .controls.controls-collapsed {
+  gap: 8px;
+}
+
+body.mobile-portrait-ui.mobile-table-collapsed .table-wrap,
+body.mobile-portrait-ui.mobile-table-collapsed .footnote {
+  display: none;
+}
+
 .controls,
 .chart-zone {
   border: 1px solid var(--line);
@@ -286,6 +317,32 @@ body.theme-dark .controls {
   letter-spacing: 0.02em;
   font-weight: 700;
   font-family: var(--display-font);
+}
+
+.controls-collapse-btn,
+.mobile-table-toggle {
+  display: none;
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(228, 241, 253, 0.95));
+  color: var(--text);
+  font-size: 0.84rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+body.mobile-portrait-ui .controls-collapse-btn,
+body.mobile-portrait-ui .mobile-table-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mobile-table-toggle {
+  margin-top: 2px;
 }
 
 .control-block {

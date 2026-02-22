@@ -35,6 +35,9 @@ const selectAllBtn = document.getElementById("selectAllBtn");
 const clearAllBtn = document.getElementById("clearAllBtn");
 const drawdownBtn = document.getElementById("drawdownBtn");
 const chartTableBtn = document.getElementById("chartTableBtn");
+const controlsEl = document.querySelector(".controls");
+const controlsCollapseBtn = document.getElementById("controlsCollapseBtn");
+const tableCollapseBtn = document.getElementById("tableCollapseBtn");
 const statusEl = document.getElementById("statusText");
 const summaryBodyEl = document.getElementById("summaryBody");
 const chartTitleEl = document.getElementById("chartTitle");
@@ -208,6 +211,9 @@ let pendingZoomPayload = null;
 let isSyncingRangeFromSlider = false;
 let textMeasureContext = null;
 let resizeRenderTimer = null;
+let hasAppliedMobilePortraitDefaults = false;
+let mobileControlsCollapsed = false;
+let mobileTableCollapsed = false;
 
 function isFiniteNumber(value) {
   return typeof value === "number" && Number.isFinite(value);
@@ -623,6 +629,58 @@ function getZoomPayload(event) {
 function isTouchPortraitViewport() {
   if (typeof window === "undefined" || typeof window.matchMedia !== "function") return false;
   return window.matchMedia("(hover: none) and (pointer: coarse) and (orientation: portrait)").matches;
+}
+
+function updateControlsCollapseButton() {
+  if (!controlsCollapseBtn) return;
+  const isCollapsed = controlsEl?.classList.contains("controls-collapsed");
+  controlsCollapseBtn.setAttribute("aria-expanded", String(!isCollapsed));
+  controlsCollapseBtn.textContent = isCollapsed ? "展开设置面板" : "收起设置面板";
+}
+
+function updateTableCollapseButton() {
+  if (!tableCollapseBtn) return;
+  const isCollapsed = Boolean(document.body?.classList.contains("mobile-table-collapsed"));
+  tableCollapseBtn.setAttribute("aria-expanded", String(!isCollapsed));
+  tableCollapseBtn.textContent = isCollapsed ? "展开下方数据表" : "收起下方数据表";
+}
+
+function setMobileControlsCollapsed(nextCollapsed, { force = false } = {}) {
+  if (!controlsEl) return;
+  mobileControlsCollapsed = Boolean(nextCollapsed);
+  const shouldApply = force || isTouchPortraitViewport();
+  controlsEl.classList.toggle("controls-collapsed", shouldApply && mobileControlsCollapsed);
+  updateControlsCollapseButton();
+}
+
+function setMobileTableCollapsed(nextCollapsed, { force = false } = {}) {
+  if (!document.body) return;
+  mobileTableCollapsed = Boolean(nextCollapsed);
+  const shouldApply = force || isTouchPortraitViewport();
+  document.body.classList.toggle("mobile-table-collapsed", shouldApply && mobileTableCollapsed);
+  updateTableCollapseButton();
+}
+
+function applyMobilePortraitUiEnhancements() {
+  if (!document.body) return;
+  const mobilePortrait = isTouchPortraitViewport();
+  document.body.classList.toggle("mobile-portrait-ui", mobilePortrait);
+
+  if (mobilePortrait) {
+    if (!hasAppliedMobilePortraitDefaults) {
+      mobileControlsCollapsed = true;
+      mobileTableCollapsed = true;
+      hasAppliedMobilePortraitDefaults = true;
+    }
+    setMobileControlsCollapsed(mobileControlsCollapsed, { force: true });
+    setMobileTableCollapsed(mobileTableCollapsed, { force: true });
+    return;
+  }
+
+  controlsEl?.classList.remove("controls-collapsed");
+  document.body.classList.remove("mobile-table-collapsed");
+  updateControlsCollapseButton();
+  updateTableCollapseButton();
 }
 
 function getResponsiveChartWidth(chartWidth) {
@@ -3614,6 +3672,21 @@ function bindEvents() {
     render();
   });
 
+  if (controlsCollapseBtn) {
+    controlsCollapseBtn.addEventListener("click", () => {
+      if (!isTouchPortraitViewport()) return;
+      setMobileControlsCollapsed(!mobileControlsCollapsed);
+      syncChartViewport();
+    });
+  }
+
+  if (tableCollapseBtn) {
+    tableCollapseBtn.addEventListener("click", () => {
+      if (!isTouchPortraitViewport()) return;
+      setMobileTableCollapsed(!mobileTableCollapsed);
+    });
+  }
+
   chart.on("click", (params) => {
     if (params?.componentType === "series" && params?.seriesName) {
       toggleCityVisibility(params.seriesName);
@@ -3737,6 +3810,7 @@ function bindEvents() {
   });
 
   window.addEventListener("resize", () => {
+    applyMobilePortraitUiEnhancements();
     syncChartViewport();
     if (resizeRenderTimer) {
       clearTimeout(resizeRenderTimer);
@@ -3766,6 +3840,7 @@ function init() {
     return;
   }
 
+  applyMobilePortraitUiEnhancements();
   bindEvents();
   bindChartWheelToPageScroll();
   render();
