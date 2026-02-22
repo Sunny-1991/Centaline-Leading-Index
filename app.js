@@ -6,7 +6,6 @@ const SOURCE_CONFIGS = [
     key: "centaline6",
     label: "中原领先指数（6城）",
     legendLabel: "中原",
-    metaLabel: "中原6城",
     sourceTitle: "中原领先指数（月度）",
     heroSubtitle: "数据来源：Wind、中原研究中心",
     defaultSelectedNames: null,
@@ -16,7 +15,6 @@ const SOURCE_CONFIGS = [
     key: "nbs70",
     label: "国家统计局（二手住宅70城）",
     legendLabel: "统计局",
-    metaLabel: "统计局70城",
     sourceTitle: "国家统计局70城二手住宅销售价格指数（上月=100，链式定基）",
     heroSubtitle: "数据来源：国家统计局（70城二手住宅销售价格指数）",
     defaultSelectedNames: ["北京", "上海", "广州", "深圳", "天津", "重庆"],
@@ -29,6 +27,7 @@ const startMonthEl = document.getElementById("startMonth");
 const endMonthEl = document.getElementById("endMonth");
 const dataSourceEl = document.getElementById("dataSource");
 const themeModeEl = document.getElementById("themeMode");
+const cityBlockTitleEl = document.getElementById("cityBlockTitle");
 const compareSourceEl = document.getElementById("compareSource");
 const compareHintEl = document.getElementById("compareHint");
 const renderBtn = document.getElementById("renderBtn");
@@ -45,8 +44,9 @@ const chartStatsOverlayEl = document.getElementById("chartStatsOverlay");
 const chartEl = document.getElementById("chart");
 const chartStageEl = chartEl ? chartEl.closest(".chart-stage") : null;
 const sourceSubtitleEl = document.getElementById("sourceSubtitleText");
-const cityBlockTitleEl = document.getElementById("cityBlockTitle");
-const CITY_LIST_THREE_COLS_CLASS = "city-list--three-cols";
+const THEME_MODE_STORAGE_KEY = "house-price-theme-mode";
+const THEME_MODE_LIGHT = "light";
+const THEME_MODE_DARK = "dark";
 
 const chart = echarts.init(chartEl, null, {
   renderer: "canvas",
@@ -61,12 +61,12 @@ const LEGACY_CORE_CITY_COLORS = Object.freeze({
   天津: "#7d8b99",
 });
 const LEGACY_CORE_CITY_COLORS_DARK = Object.freeze({
-  北京: "#62b7ff",
-  上海: "#ffb36b",
-  深圳: "#7fd67f",
-  广州: "#ffe07a",
-  香港: "#f1f5fa",
-  天津: "#a9bfd4",
+  北京: "#64baf8",
+  上海: "#ffb264",
+  深圳: "#63d7a2",
+  广州: "#f7cf63",
+  香港: "#d4dde4",
+  天津: "#96bdd4",
 });
 const OTHER_CITY_DISTINCT_PALETTE = [
   "#7f3fbf",
@@ -85,85 +85,26 @@ const OTHER_CITY_DISTINCT_PALETTE = [
   "#118ab2",
 ];
 const OTHER_CITY_DISTINCT_PALETTE_DARK = [
-  "#7ec6ff",
-  "#ff9f6e",
-  "#84dba8",
-  "#ffc36b",
-  "#b694ff",
-  "#ff82a6",
-  "#68d9d1",
-  "#9cc9ff",
-  "#ffd166",
-  "#8de18f",
-  "#ff7f7f",
-  "#8bc3ff",
-  "#d3b2ff",
-  "#7ee0ff",
+  "#bf8fff",
+  "#ff738d",
+  "#43cfe0",
+  "#ff7e70",
+  "#79a0ff",
+  "#ff73ba",
+  "#49cfb1",
+  "#a893ff",
+  "#ff8bd8",
+  "#44bfb8",
+  "#d8a085",
+  "#8da2ff",
+  "#ff95a4",
+  "#66bbff",
 ];
-const THEME_STORAGE_KEY = "house-price-theme-mode";
-const THEME_MODE_LIGHT = "light";
-const THEME_MODE_DARK = "dark";
-const THEME_MODES = new Set([THEME_MODE_LIGHT, THEME_MODE_DARK]);
-const CHART_THEME_TOKENS = Object.freeze({
-  [THEME_MODE_LIGHT]: {
-    chartBackground: "#ffffff",
-    chartText: "#22364f",
-    legendText: "#253b57",
-    tooltipBackground: "rgba(238, 246, 255, 0.98)",
-    tooltipBorder: "rgba(132, 156, 190, 0.76)",
-    tooltipText: "#20354e",
-    axisLine: "#7892b2",
-    axisLabel: "#33506f",
-    yAxisLine: "#4f6f95",
-    yAxisLabel: "#2f4b69",
-    zoomFiller: "rgba(79, 111, 255, 0.2)",
-    zoomSelected: "rgba(79, 111, 255, 0.26)",
-    zoomMoveHandle: "rgba(79, 111, 255, 0.32)",
-    zoomHandleColor: "rgba(230, 240, 255, 0.96)",
-    zoomHandleBorder: "rgba(79, 111, 255, 0.86)",
-    zoomMoveHandleHover: "rgba(79, 111, 255, 0.42)",
-    zoomHandleHover: "rgba(241, 248, 255, 0.99)",
-    zoomHandleHoverBorder: "rgba(79, 111, 255, 0.94)",
-    textMaskColor: "rgba(255, 255, 255, 0.64)",
-    toolboxIcon: "#4c6685",
-    toolboxIconHover: "#4f6fff",
-    exportBackground: "#ffffff",
-    overlayTitleColor: "#1f3550",
-    overlayLineColor: "#627f9f",
-    overlayTextColor: "#21364f",
-    overlaySubTextColor: "#506b89",
-  },
-  [THEME_MODE_DARK]: {
-    chartBackground: "#111820",
-    chartText: "#d7e0ea",
-    legendText: "#d7e0ea",
-    tooltipBackground: "rgba(13, 20, 28, 0.97)",
-    tooltipBorder: "rgba(120, 139, 156, 0.62)",
-    tooltipText: "#e6edf4",
-    axisLine: "#7c8d9b",
-    axisLabel: "#c6d0da",
-    yAxisLine: "#8a9cab",
-    yAxisLabel: "#bcc8d4",
-    zoomFiller: "rgba(241, 163, 72, 0.2)",
-    zoomSelected: "rgba(241, 163, 72, 0.26)",
-    zoomMoveHandle: "rgba(241, 163, 72, 0.34)",
-    zoomHandleColor: "rgba(37, 49, 61, 0.95)",
-    zoomHandleBorder: "rgba(241, 163, 72, 0.88)",
-    zoomMoveHandleHover: "rgba(255, 183, 92, 0.44)",
-    zoomHandleHover: "rgba(49, 63, 78, 0.98)",
-    zoomHandleHoverBorder: "rgba(255, 196, 120, 0.96)",
-    textMaskColor: "rgba(12, 18, 24, 0.56)",
-    toolboxIcon: "#ced8e2",
-    toolboxIconHover: "#f4b04f",
-    exportBackground: "#111820",
-    overlayTitleColor: "#e7edf4",
-    overlayLineColor: "#95a6b6",
-    overlayTextColor: "#dde6ef",
-    overlaySubTextColor: "#acbbc8",
-  },
-});
-const dynamicCityColorMap = new Map();
-const dynamicColorCursorByTheme = {
+const dynamicCityColorMaps = {
+  [THEME_MODE_LIGHT]: new Map(),
+  [THEME_MODE_DARK]: new Map(),
+};
+const dynamicColorCursors = {
   [THEME_MODE_LIGHT]: 0,
   [THEME_MODE_DARK]: 0,
 };
@@ -181,13 +122,61 @@ const OVERLAY_TOP_RATIO = 0.05;
 const OVERLAY_SCALE_MIN = 0.72;
 const OVERLAY_SCALE_MAX = 1.3;
 const OVERLAY_TABLE_SCALE = 1.05;
-const LEGEND_FONT_SCALE = 1.05;
-const X_AXIS_LABEL_FONT_SCALE = 1.1;
 const CHART_GRID_LAYOUT = Object.freeze({
   left: 70,
   right: 90,
   top: 44,
   bottom: 112,
+});
+const CHART_THEME_STYLES = Object.freeze({
+  [THEME_MODE_LIGHT]: Object.freeze({
+    chartBackground: "#ffffff",
+    chartTextColor: "#26333b",
+    legendTextColor: "#26333b",
+    xAxisLineColor: "#8b8d90",
+    xAxisLabelColor: "#36454f",
+    yAxisLineColor: "#547086",
+    yAxisLabelColor: "#304451",
+    sliderHandleColor: "rgba(255, 255, 255, 0.72)",
+    sliderHandleBorderColor: "rgba(31, 109, 155, 0.72)",
+    sliderHandleHoverColor: "rgba(255, 255, 255, 0.9)",
+    sliderHandleHoverBorderColor: "rgba(31, 109, 155, 0.86)",
+    textMaskColor: "rgba(255, 255, 255, 0.36)",
+    overlayTitleColor: "#22282d",
+    overlayLineColor: "#6f747a",
+    overlayTextColor: "#1f252a",
+    overlaySubTextColor: "#4a5661",
+    tooltipBackground: "rgba(255, 255, 255, 0.96)",
+    tooltipBorderColor: "rgba(182, 197, 208, 0.92)",
+    tooltipTextColor: "#2f3d47",
+    tooltipAxisPointerColor: "rgba(122, 140, 153, 0.88)",
+    tooltipExtraCssText:
+      "border-radius:8px;box-shadow:0 10px 22px rgba(15,32,47,.18);backdrop-filter:blur(2px);",
+  }),
+  [THEME_MODE_DARK]: Object.freeze({
+    chartBackground: "#101820",
+    chartTextColor: "#d6e0e8",
+    legendTextColor: "#dae4ec",
+    xAxisLineColor: "#7d8e9b",
+    xAxisLabelColor: "#bfced8",
+    yAxisLineColor: "#8ca1b0",
+    yAxisLabelColor: "#cad6df",
+    sliderHandleColor: "rgba(246, 161, 51, 0.34)",
+    sliderHandleBorderColor: "rgba(246, 161, 51, 0.9)",
+    sliderHandleHoverColor: "rgba(255, 185, 94, 0.42)",
+    sliderHandleHoverBorderColor: "rgba(255, 185, 94, 0.98)",
+    textMaskColor: "rgba(7, 11, 16, 0.58)",
+    overlayTitleColor: "#d7e1e9",
+    overlayLineColor: "#95a3af",
+    overlayTextColor: "#d5dfe7",
+    overlaySubTextColor: "#a8b8c4",
+    tooltipBackground: "rgba(17, 25, 33, 0.96)",
+    tooltipBorderColor: "rgba(69, 86, 102, 0.95)",
+    tooltipTextColor: "#d9e4ec",
+    tooltipAxisPointerColor: "rgba(158, 174, 187, 0.92)",
+    tooltipExtraCssText:
+      "border-radius:8px;box-shadow:0 14px 30px rgba(0,0,0,.5);backdrop-filter:blur(2px);",
+  }),
 });
 const MAX_SELECTED_CITY_COUNT = 6;
 const COMPARE_CITY_WHITELIST = new Set(["北京", "上海", "广州", "深圳", "天津"]);
@@ -201,12 +190,12 @@ const OVERLAY_SOURCE_PROFILES = Object.freeze({
     sourceNote: "国家统计局",
   },
 });
+const CITY_LIST_THREE_COLS_CLASS = "city-list--three-cols";
 const cityById = new Map();
 const cityValidRanges = new Map();
 const uiState = {
   showDrawdownAnalysis: false,
   showChartTable: true,
-  themeMode: THEME_MODE_LIGHT,
   hiddenCityNames: new Set(),
   zoomStartMonth: null,
   zoomEndMonth: null,
@@ -240,6 +229,14 @@ function formatMonthZh(month) {
   return `${year}年${Number(m)}月`;
 }
 
+function formatMonthDot(month) {
+  const token = normalizeMonthToken(month);
+  if (!token) return "";
+  const matched = token.match(/^(\d{4})-(\d{2})$/);
+  if (!matched) return token;
+  return `${matched[1]}.${matched[2]}`;
+}
+
 function normalizeMonthToken(value) {
   const text = String(value || "").trim();
   if (!text) return "";
@@ -255,46 +252,58 @@ function normalizeMonthToken(value) {
   return text;
 }
 
-function getSafeThemeMode(mode) {
-  return THEME_MODES.has(mode) ? mode : THEME_MODE_LIGHT;
+function normalizeThemeMode(value) {
+  return value === THEME_MODE_DARK ? THEME_MODE_DARK : THEME_MODE_LIGHT;
 }
 
-function getPersistedThemeMode() {
+function readStoredThemeMode() {
   try {
-    return getSafeThemeMode(window.localStorage.getItem(THEME_STORAGE_KEY));
+    return normalizeThemeMode(window.localStorage.getItem(THEME_MODE_STORAGE_KEY));
   } catch (error) {
     return THEME_MODE_LIGHT;
   }
 }
 
-function persistThemeMode(mode) {
-  try {
-    window.localStorage.setItem(THEME_STORAGE_KEY, getSafeThemeMode(mode));
-  } catch (error) {
-    // ignore
-  }
+function getCurrentThemeMode() {
+  const mode = document.body?.dataset?.theme;
+  return normalizeThemeMode(mode);
 }
 
-function getChartThemeTokens(mode = uiState.themeMode) {
-  const safeMode = getSafeThemeMode(mode);
-  return CHART_THEME_TOKENS[safeMode] || CHART_THEME_TOKENS[THEME_MODE_LIGHT];
+function getActiveChartThemeStyle() {
+  return CHART_THEME_STYLES[getCurrentThemeMode()] || CHART_THEME_STYLES[THEME_MODE_LIGHT];
 }
 
-function applyThemeMode(mode, { persist = true } = {}) {
-  const safeMode = getSafeThemeMode(mode);
-  const isDarkMode = safeMode === THEME_MODE_DARK;
-  const changed = uiState.themeMode !== safeMode;
-  uiState.themeMode = safeMode;
+function getThemeCoreCityPalette() {
+  return getCurrentThemeMode() === THEME_MODE_DARK
+    ? LEGACY_CORE_CITY_COLORS_DARK
+    : LEGACY_CORE_CITY_COLORS;
+}
+
+function getThemeCityPalette() {
+  return getCurrentThemeMode() === THEME_MODE_DARK
+    ? OTHER_CITY_DISTINCT_PALETTE_DARK
+    : OTHER_CITY_DISTINCT_PALETTE;
+}
+
+function applyThemeMode(nextMode, { persist = true, rerender = true } = {}) {
+  const mode = normalizeThemeMode(nextMode);
   if (document.body) {
-    document.body.classList.toggle("theme-stripe-dark", isDarkMode);
+    document.body.dataset.theme = mode;
+    document.body.classList.toggle("theme-dark", mode === THEME_MODE_DARK);
   }
-  if (themeModeEl && themeModeEl.value !== safeMode) {
-    themeModeEl.value = safeMode;
+  if (themeModeEl && themeModeEl.value !== mode) {
+    themeModeEl.value = mode;
   }
   if (persist) {
-    persistThemeMode(safeMode);
+    try {
+      window.localStorage.setItem(THEME_MODE_STORAGE_KEY, mode);
+    } catch (error) {
+      // ignore storage failure
+    }
   }
-  return changed;
+  if (rerender && raw) {
+    render();
+  }
 }
 
 function setStatus(text, isError = false) {
@@ -358,18 +367,22 @@ function applyDataSource(sourceKey) {
   if (dataSourceEl && dataSourceEl.value !== source.key) {
     dataSourceEl.value = source.key;
   }
+  const isNbsSource = source.key === "nbs70" || /统计局/.test(String(source.label || ""));
   if (cityBlockTitleEl) {
     cityBlockTitleEl.textContent =
-      source.key === "centaline6" ? "城市" : "城市（可选多至6个）";
+      isNbsSource ? "城市（可选多至6个）" : "城市";
   }
-  cityListEl.classList.toggle(CITY_LIST_THREE_COLS_CLASS, source.key === "nbs70");
-  const canUseSelectAll = source.key !== "nbs70";
-  if (selectAllBtn) {
-    selectAllBtn.hidden = !canUseSelectAll;
-    selectAllBtn.disabled = !canUseSelectAll;
-  }
-  if (clearAllBtn) {
-    clearAllBtn.style.gridColumn = canUseSelectAll ? "" : "1 / -1";
+  cityListEl.classList.add("city-list");
+  cityListEl.classList.toggle(CITY_LIST_THREE_COLS_CLASS, isNbsSource);
+  cityListEl.style.display = "grid";
+  if (isNbsSource) {
+    cityListEl.style.gridTemplateColumns = "repeat(3, minmax(0, 1fr))";
+    cityListEl.style.columnGap = "8px";
+    cityListEl.style.rowGap = "6px";
+  } else {
+    cityListEl.style.removeProperty("grid-template-columns");
+    cityListEl.style.removeProperty("column-gap");
+    cityListEl.style.removeProperty("row-gap");
   }
 
   uiState.hiddenCityNames.clear();
@@ -669,7 +682,7 @@ function resolveXAxisLabelLayout(months, chartWidth, visibleStartIndex, visibleE
   return {
     margin,
     rotate: 0,
-    fontSize: Math.round(fontSize * X_AXIS_LABEL_FONT_SCALE * 10) / 10,
+    fontSize,
     formatLabel(value) {
       const text = normalizeMonthToken(value);
       if (!text) return "";
@@ -878,7 +891,7 @@ function buildMonthSelects(dates) {
   endMonthEl.value = defaultEnd;
 }
 
-function colorFromCityName(cityName = "", index = 0, themeMode = THEME_MODE_LIGHT) {
+function colorFromCityName(cityName = "", index = 0, themeMode = getCurrentThemeMode()) {
   const text = String(cityName);
   let hash = 0;
   for (let i = 0; i < text.length; i += 1) {
@@ -887,35 +900,30 @@ function colorFromCityName(cityName = "", index = 0, themeMode = THEME_MODE_LIGH
   const seed = (hash + index * 67) % 360;
   const hue = (seed * 19) % 360;
   if (themeMode === THEME_MODE_DARK) {
-    return `hsl(${hue}, 78%, 64%)`;
+    return `hsl(${hue}, 84%, 64%)`;
   }
   return `hsl(${hue}, 72%, 40%)`;
 }
 
 function getColor(cityName, index) {
-  const themeMode = getSafeThemeMode(uiState.themeMode);
-  if (themeMode === THEME_MODE_DARK && LEGACY_CORE_CITY_COLORS_DARK[cityName]) {
-    return LEGACY_CORE_CITY_COLORS_DARK[cityName];
-  }
-  if (themeMode === THEME_MODE_LIGHT && LEGACY_CORE_CITY_COLORS[cityName]) {
-    return LEGACY_CORE_CITY_COLORS[cityName];
-  }
+  const themeMode = getCurrentThemeMode();
+  const corePalette = getThemeCoreCityPalette();
+  if (corePalette[cityName]) return corePalette[cityName];
 
-  const cacheKey = `${themeMode}::${cityName}`;
-  if (dynamicCityColorMap.has(cacheKey)) return dynamicCityColorMap.get(cacheKey);
+  const palette = getThemeCityPalette();
+  const themeColorMap = dynamicCityColorMaps[themeMode];
+  if (themeColorMap.has(cityName)) return themeColorMap.get(cityName);
 
+  let cursor = dynamicColorCursors[themeMode];
   let nextColor = "";
-  const palette =
-    themeMode === THEME_MODE_DARK ? OTHER_CITY_DISTINCT_PALETTE_DARK : OTHER_CITY_DISTINCT_PALETTE;
-  const currentCursor = dynamicColorCursorByTheme[themeMode] || 0;
-  if (currentCursor < palette.length) {
-    nextColor = palette[currentCursor];
-    dynamicColorCursorByTheme[themeMode] = currentCursor + 1;
+  if (cursor < palette.length) {
+    nextColor = palette[cursor];
+    cursor += 1;
   } else {
-    nextColor = colorFromCityName(cityName, index + currentCursor, themeMode);
-    dynamicColorCursorByTheme[themeMode] = currentCursor + 1;
+    nextColor = colorFromCityName(cityName, index + cursor, themeMode);
   }
-  dynamicCityColorMap.set(cacheKey, nextColor);
+  dynamicColorCursors[themeMode] = cursor;
+  themeColorMap.set(cityName, nextColor);
   return nextColor;
 }
 
@@ -1542,139 +1550,63 @@ function loadImageByURL(url) {
   });
 }
 
-function resolveExportRenderLayout(option = {}, pixelRatio = 2) {
-  const gridBottomRaw = option.grid?.[0]?.bottom;
-  const gridBottom = Number.isFinite(Number(gridBottomRaw))
-    ? Number(gridBottomRaw)
-    : CHART_GRID_LAYOUT.bottom;
-  const legendBottomRaw = option.legend?.[0]?.bottom;
-  const legendBottom = Number.isFinite(Number(legendBottomRaw))
-    ? Number(legendBottomRaw)
-    : 10;
-  const isLightMode = getSafeThemeMode(uiState.themeMode) === THEME_MODE_LIGHT;
-  const exportEdgeTrimPx = isLightMode ? Math.max(1, Math.round(pixelRatio * 1.1)) : 0;
-  return {
-    gridBottom,
-    legendBottom,
-    exportGridBottom: Math.max(38, gridBottom - 74),
-    exportLegendBottom: clampNumber(legendBottom + 24, legendBottom, 44),
-    exportTrimBottomPx: Math.max(10, Math.round(14 * pixelRatio)),
-    exportTrimTopPx: exportEdgeTrimPx,
-    exportTrimLeftPx: exportEdgeTrimPx,
-    exportTrimRightPx: exportEdgeTrimPx,
-  };
-}
-
-function trimCanvasByInsets(canvas, { top = 0, right = 0, bottom = 0, left = 0 } = {}) {
-  if (!canvas) return canvas;
-  const safeTop = Math.max(0, Math.round(top));
-  const safeRight = Math.max(0, Math.round(right));
-  const safeBottom = Math.max(0, Math.round(bottom));
-  const safeLeft = Math.max(0, Math.round(left));
-  const sourceWidth = canvas.width;
-  const sourceHeight = canvas.height;
-  const targetWidth = sourceWidth - safeLeft - safeRight;
-  const targetHeight = sourceHeight - safeTop - safeBottom;
-  if (targetWidth <= 1 || targetHeight <= 1) return canvas;
-
-  const trimmedCanvas = document.createElement("canvas");
-  trimmedCanvas.width = targetWidth;
-  trimmedCanvas.height = targetHeight;
-  const trimmedCtx = trimmedCanvas.getContext("2d");
-  if (!trimmedCtx) return canvas;
-  trimmedCtx.drawImage(
-    canvas,
-    safeLeft,
-    safeTop,
-    targetWidth,
-    targetHeight,
-    0,
-    0,
-    targetWidth,
-    targetHeight,
-  );
-  return trimmedCanvas;
-}
-
 async function captureChartStageSnapshot(pixelRatio = 2) {
   if (!chartStageEl) return null;
   if (typeof window.html2canvas !== "function") return null;
-  const chartTheme = getChartThemeTokens();
 
   const stageRect = chartStageEl.getBoundingClientRect();
   if (!stageRect.width || !stageRect.height) return null;
+  const chartTheme = getActiveChartThemeStyle();
   const option = chart.getOption?.() || {};
-  const toolboxShow = option.toolbox?.[0]?.show !== false;
   const sliderDataZoom = Array.isArray(option.dataZoom)
     ? option.dataZoom.find((item) => item?.type === "slider")
     : null;
-  const sliderShow = sliderDataZoom ? sliderDataZoom.show !== false : true;
-  const exportLayout = resolveExportRenderLayout(option, pixelRatio);
+  const sliderShow = sliderDataZoom ? sliderDataZoom.show !== false : false;
 
-  const hideOption = {
-    toolbox: {
-      show: false,
-    },
-    legend: {
-      bottom: exportLayout.exportLegendBottom,
-    },
-    grid: {
-      bottom: exportLayout.exportGridBottom,
-    },
-  };
-  if (sliderDataZoom) {
-    hideOption.dataZoom = [
+  if (sliderDataZoom && sliderShow) {
+    chart.setOption(
       {
-        type: "slider",
-        show: false,
+        dataZoom: [
+          {
+            type: "slider",
+            show: false,
+          },
+        ],
       },
-    ];
+      { lazyUpdate: false },
+    );
   }
-  chart.setOption(hideOption, { lazyUpdate: false });
 
   let stageCanvas = null;
   try {
-    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    if (sliderDataZoom && sliderShow) {
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    }
     stageCanvas = await window.html2canvas(chartStageEl, {
-      backgroundColor: chartTheme.exportBackground,
+      backgroundColor: chartTheme.chartBackground,
       scale: pixelRatio,
       useCORS: true,
       logging: false,
     });
   } finally {
-    const restoreOption = {
-      toolbox: {
-        show: toolboxShow,
-      },
-      legend: {
-        bottom: exportLayout.legendBottom,
-      },
-      grid: {
-        bottom: exportLayout.gridBottom,
-      },
-    };
-    if (sliderDataZoom) {
-      restoreOption.dataZoom = [
+    if (sliderDataZoom && sliderShow) {
+      chart.setOption(
         {
-          type: "slider",
-          show: sliderShow,
+          dataZoom: [
+            {
+              type: "slider",
+              show: true,
+            },
+          ],
         },
-      ];
+        { lazyUpdate: false },
+      );
     }
-    chart.setOption(restoreOption, { lazyUpdate: false });
   }
 
   if (!stageCanvas) return null;
-
-  const outputCanvas = trimCanvasByInsets(stageCanvas, {
-    top: exportLayout.exportTrimTopPx,
-    right: exportLayout.exportTrimRightPx,
-    bottom: exportLayout.exportTrimBottomPx,
-    left: exportLayout.exportTrimLeftPx,
-  });
-
   return {
-    dataURL: outputCanvas.toDataURL("image/png"),
+    dataURL: stageCanvas.toDataURL("image/png"),
   };
 }
 
@@ -1684,7 +1616,6 @@ function drawOverlaySummaryOnCanvas(ctx, canvasWidth, canvasHeight, exportContex
     ? exportContext.visibleSummaryRows
     : [];
   if (rows.length === 0) return;
-  const chartTheme = getChartThemeTokens();
 
   const { isCrossSource, headerLabel, sourceNoteText } = resolveOverlayPresentation(rows);
 
@@ -1718,6 +1649,7 @@ function drawOverlaySummaryOnCanvas(ctx, canvasWidth, canvasHeight, exportContex
     : boxX - tableDelta / 2;
   const centerX = tableX + tableW / 2;
   const fontFamily = '"STKaiti","Kaiti SC","KaiTi","BiauKai",serif';
+  const chartTheme = getActiveChartThemeStyle();
 
   const mainFontSize = Math.max(16, Math.round(19 * scaleY));
   const subFontSize = Math.max(12, Math.round(13 * scaleY));
@@ -1831,6 +1763,7 @@ function drawOverlaySummaryOnCanvas(ctx, canvasWidth, canvasHeight, exportContex
   cursorY = headerBottomY + orderedRows.length * rowHeight + Math.round(8 * scaleY);
   ctx.font = `400 ${noteFontSize}px ${fontFamily}`;
   ctx.textAlign = "left";
+  ctx.fillStyle = titleColor;
   const noteLeftX = tableX - noteFontSize * 1.5;
   ctx.fillText(`*数据来源：${sourceNoteText}`, noteLeftX, cursorY);
   ctx.fillText(
@@ -1861,66 +1794,13 @@ async function exportCurrentChartImage(pixelRatio = 2, label = "标准清晰") {
     return;
   }
 
-  const option = chart.getOption?.() || {};
-  const sliderDataZoom = Array.isArray(option.dataZoom)
-    ? option.dataZoom.find((item) => item?.type === "slider")
-    : null;
-  const sliderShow = sliderDataZoom ? sliderDataZoom.show !== false : true;
-  const toolboxShow = option.toolbox?.[0]?.show !== false;
-  const exportLayout = resolveExportRenderLayout(option, pixelRatio);
-
-  const exportOnlyOption = {
-    toolbox: {
-      show: false,
-    },
-    legend: {
-      bottom: exportLayout.exportLegendBottom,
-    },
-    grid: {
-      bottom: exportLayout.exportGridBottom,
-    },
-  };
-  if (sliderDataZoom) {
-    exportOnlyOption.dataZoom = [
-      {
-        type: "slider",
-        show: false,
-      },
-    ];
-  }
-
-  chart.setOption(exportOnlyOption, { lazyUpdate: false });
-  let chartDataUrl = "";
-  try {
-    chartDataUrl = chart.getDataURL({
-      type: "png",
-      pixelRatio,
-      backgroundColor: getChartThemeTokens().exportBackground,
-      excludeComponents: ["toolbox", "dataZoom"],
-    });
-  } finally {
-    const restoreOption = {
-      toolbox: {
-        show: toolboxShow,
-      },
-      legend: {
-        bottom: exportLayout.legendBottom,
-      },
-      grid: {
-        bottom: exportLayout.gridBottom,
-      },
-    };
-    if (sliderDataZoom) {
-      restoreOption.dataZoom = [
-        {
-          type: "slider",
-          show: sliderShow,
-        },
-      ];
-    }
-    chart.setOption(restoreOption, { lazyUpdate: false });
-  }
-
+  const chartTheme = getActiveChartThemeStyle();
+  const chartDataUrl = chart.getDataURL({
+    type: "png",
+    pixelRatio,
+    backgroundColor: chartTheme.chartBackground,
+    excludeComponents: ["toolbox", "dataZoom"],
+  });
   let chartImage;
   try {
     chartImage = await loadImageByURL(chartDataUrl);
@@ -1937,21 +1817,14 @@ async function exportCurrentChartImage(pixelRatio = 2, label = "标准清晰") {
     setStatus("导出失败：无法创建画布。", true);
     return;
   }
-  ctx.fillStyle = getChartThemeTokens().exportBackground;
+  ctx.fillStyle = chartTheme.chartBackground;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.drawImage(chartImage, 0, 0);
   drawOverlaySummaryOnCanvas(ctx, canvas.width, canvas.height, latestRenderContext);
 
-  const outputCanvas = trimCanvasByInsets(canvas, {
-    top: exportLayout.exportTrimTopPx,
-    right: exportLayout.exportTrimRightPx,
-    bottom: exportLayout.exportTrimBottomPx,
-    left: exportLayout.exportTrimLeftPx,
-  });
-
   const suffix = pixelRatio >= 4 ? "-ultra-hd" : "";
   const filename = `house-price-base100-${latestRenderContext.startMonth}-to-${latestRenderContext.endMonth}${suffix}.png`;
-  downloadByDataURL(outputCanvas.toDataURL("image/png"), filename);
+  downloadByDataURL(canvas.toDataURL("image/png"), filename);
   setStatus(`图片已导出（${label}，含当前分析与表格设置）。`, false);
 }
 
@@ -2381,12 +2254,17 @@ function makeOption(
     visibleEndIndex,
   );
   const endLabelFontSize = chartWidth <= 520 ? 14 : chartWidth <= 760 ? 16 : 18;
-  const legendFontSize = chartWidth <= 520 ? 12.5 : chartWidth <= 760 ? 13.5 : 15;
-  const legendFontSizeScaled = Math.round(legendFontSize * LEGEND_FONT_SCALE * 10) / 10;
+  const legendBaseFontSize = chartWidth <= 520 ? 12.5 : chartWidth <= 760 ? 13.5 : 15;
+  const legendFontSize = Number((legendBaseFontSize * 1.05).toFixed(2));
+  const xAxisLabelFontSize = Number((xAxisLabelLayout.fontSize * 1.1).toFixed(2));
   const yAxisLabelFontSize = chartWidth <= 520 ? 12 : chartWidth <= 760 ? 13 : 14;
   const seriesLineWidth = chartWidth <= 520 ? 1.88 : chartWidth <= 760 ? 2.1 : 3.02;
   const markLineWidth = chartWidth <= 520 ? 1.15 : chartWidth <= 760 ? 1.32 : 2;
   const markSymbolSize = chartWidth <= 520 ? 8 : chartWidth <= 760 ? 9 : 10;
+  const sliderBaseHeight = chartWidth <= 520 ? 12 : chartWidth <= 760 ? 13 : 14;
+  const sliderHeight = Math.max(10, Math.round(sliderBaseHeight * 1.1));
+  const sliderBottom = Math.max(0, CHART_GRID_LAYOUT.bottom - Math.round(sliderHeight / 2));
+  const legendBottom = Math.max(18, Math.round(sliderBottom - (chartWidth <= 520 ? 62 : 74)));
   const plotBounds = {
     left: CHART_GRID_LAYOUT.left,
     right: Math.max(CHART_GRID_LAYOUT.left + 1, chartWidth - CHART_GRID_LAYOUT.right),
@@ -2425,10 +2303,11 @@ function makeOption(
     top: 8,
     bottom: Math.max(9, chartHeight - 8),
   };
+  const chartTheme = getActiveChartThemeStyle();
+  const chartTextMaskColor = chartTheme.textMaskColor;
   const peakLabelRects = buildPeakLabelRectList(rendered, peakLabelLayouts, toPixelCoord);
   const occupiedDrawdownLabelRects = [];
   const occupiedRecoverLabelRects = [];
-  const chartTheme = getChartThemeTokens();
 
   return {
     backgroundColor: chartTheme.chartBackground,
@@ -2437,26 +2316,33 @@ function makeOption(
     textStyle: {
       fontFamily: CHART_FONT_FAMILY,
       fontSize: 14,
-      color: chartTheme.chartText,
+      color: chartTheme.chartTextColor,
     },
     tooltip: {
       trigger: "axis",
       axisPointer: {
         type: "line",
         snap: true,
+        lineStyle: {
+          color: chartTheme.tooltipAxisPointerColor,
+          width: 1.15,
+          type: "dashed",
+        },
       },
       backgroundColor: chartTheme.tooltipBackground,
-      borderColor: chartTheme.tooltipBorder,
+      borderColor: chartTheme.tooltipBorderColor,
       borderWidth: 1,
+      padding: [9, 12],
+      extraCssText: chartTheme.tooltipExtraCssText,
       textStyle: {
         fontFamily: CHART_FONT_FAMILY,
-        color: chartTheme.tooltipText,
+        color: chartTheme.tooltipTextColor,
       },
       formatter(params) {
         const rows = Array.isArray(params) ? params : [params];
         if (!rows.length) return "";
         const axisRaw = rows[0]?.axisValue ?? rows[0]?.axisValueLabel ?? "";
-        const headText = normalizeMonthToken(axisRaw) || String(axisRaw || "");
+        const headText = formatMonthDot(axisRaw);
         const detail = rows
           .map((item) => {
             const value = Array.isArray(item?.value)
@@ -2473,10 +2359,10 @@ function makeOption(
       },
     },
     legend: {
-      bottom: 10,
+      bottom: legendBottom,
       textStyle: {
-        color: chartTheme.legendText,
-        fontSize: legendFontSizeScaled,
+        color: chartTheme.legendTextColor,
+        fontSize: legendFontSize,
         fontWeight: 700,
         fontFamily: CHART_FONT_FAMILY,
       },
@@ -2487,14 +2373,6 @@ function makeOption(
     toolbox: {
       right: 8,
       top: 6,
-      iconStyle: {
-        borderColor: chartTheme.toolboxIcon,
-      },
-      emphasis: {
-        iconStyle: {
-          borderColor: chartTheme.toolboxIconHover,
-        },
-      },
       feature: {
         myExportImage: {
           show: true,
@@ -2525,11 +2403,11 @@ function makeOption(
         end: zoomEndPercent,
         showDetail: false,
         brushSelect: false,
-        bottom: 46,
-        height: 18,
+        bottom: sliderBottom,
+        height: sliderHeight,
         borderColor: "rgba(0, 0, 0, 0)",
         backgroundColor: "rgba(0, 0, 0, 0)",
-        fillerColor: chartTheme.zoomFiller,
+        fillerColor: "rgba(0, 0, 0, 0)",
         dataBackground: {
           lineStyle: {
             color: "rgba(0, 0, 0, 0)",
@@ -2545,25 +2423,25 @@ function makeOption(
             width: 0,
           },
           areaStyle: {
-            color: chartTheme.zoomSelected,
+            color: "rgba(0, 0, 0, 0)",
           },
         },
         moveHandleStyle: {
-          color: chartTheme.zoomMoveHandle,
+          color: "rgba(0, 0, 0, 0)",
         },
-        handleSize: "112%",
+        handleSize: "110%",
         handleStyle: {
-          color: chartTheme.zoomHandleColor,
-          borderColor: chartTheme.zoomHandleBorder,
+          color: chartTheme.sliderHandleColor,
+          borderColor: chartTheme.sliderHandleBorderColor,
           borderWidth: 1.2,
         },
         emphasis: {
           moveHandleStyle: {
-            color: chartTheme.zoomMoveHandleHover,
+            color: "rgba(0, 0, 0, 0)",
           },
           handleStyle: {
-            color: chartTheme.zoomHandleHover,
-            borderColor: chartTheme.zoomHandleHoverBorder,
+            color: chartTheme.sliderHandleHoverColor,
+            borderColor: chartTheme.sliderHandleHoverBorderColor,
             borderWidth: 1.4,
           },
         },
@@ -2582,13 +2460,13 @@ function makeOption(
         interval: 0,
         length: chartWidth <= 520 ? 4 : 5,
       },
-      axisLine: { lineStyle: { color: chartTheme.axisLine } },
+      axisLine: { lineStyle: { color: chartTheme.xAxisLineColor } },
       axisLabel: {
-        color: chartTheme.axisLabel,
+        color: chartTheme.xAxisLabelColor,
         interval: 0,
         margin: xAxisLabelLayout.margin,
         rotate: xAxisLabelLayout.rotate,
-        fontSize: xAxisLabelLayout.fontSize,
+        fontSize: xAxisLabelFontSize,
         fontWeight: 800,
         hideOverlap: true,
         showMinLabel: true,
@@ -2609,11 +2487,11 @@ function makeOption(
       max: function (value) {
         return Math.ceil((value.max + 5) / 10) * 10;
       },
-      axisLine: { show: true, lineStyle: { color: chartTheme.yAxisLine, width: 1.5 } },
+      axisLine: { show: true, lineStyle: { color: chartTheme.yAxisLineColor, width: 1.5 } },
       axisTick: { show: true, inside: true },
       splitLine: { show: false },
       axisLabel: {
-        color: chartTheme.yAxisLabel,
+        color: chartTheme.yAxisLabelColor,
         fontSize: yAxisLabelFontSize,
         fontWeight: 600,
         fontFamily: CHART_FONT_FAMILY,
@@ -2648,7 +2526,7 @@ function makeOption(
             fontFamily: CHART_FONT_FAMILY,
             fontSize: peakLabelLayout?.fontSize ?? 12,
             fontWeight: 700,
-            backgroundColor: chartTheme.textMaskColor,
+            backgroundColor: chartTextMaskColor,
             padding: peakLabelLayout?.padding || [2, 6],
             offset: peakLabelLayout?.offset || [0, 0],
             formatter: `最高点\n${peakMarker.month.replace("-", ".")}`,
@@ -2911,7 +2789,7 @@ function makeOption(
             fontFamily: CHART_FONT_FAMILY,
             fontSize: 14,
             fontWeight: 700,
-            backgroundColor: chartTheme.textMaskColor,
+            backgroundColor: chartTextMaskColor,
             padding: [2, 4],
             offset: [drawdownLabelOffsetX, 0],
             formatter: `累计跌幅\n${Math.abs(drawdown.drawdownPct).toFixed(1)}%`,
@@ -3025,7 +2903,7 @@ function makeOption(
               fontFamily: CHART_FONT_FAMILY,
               fontSize: 14,
               fontWeight: 700,
-              backgroundColor: chartTheme.textMaskColor,
+              backgroundColor: chartTextMaskColor,
               padding: [1, 2],
               formatter: recoverLabelText,
             },
@@ -3083,7 +2961,7 @@ function makeOption(
           color: item.color,
           fontFamily: CHART_FONT_FAMILY,
           fontSize: endLabelFontSize,
-          backgroundColor: endLabelSubText ? "rgba(0,0,0,0)" : chartTheme.textMaskColor,
+          backgroundColor: endLabelSubText ? "rgba(0,0,0,0)" : chartTextMaskColor,
           padding: item.endLabelSub ? [2, 5] : [1, 5],
           rich: {
             main: {
@@ -3484,15 +3362,12 @@ function render() {
   chart.dispatchAction({ type: "hideTip" });
   chart.dispatchAction({ type: "updateAxisPointer", currTrigger: "leave" });
   chartTitleEl.textContent = `热点城市二手房价格走势图`;
-  const sourceLabelShort =
-    activeSourceMeta?.metaLabel || activeSourceMeta?.legendLabel || activeSourceMeta?.label || "中原6城";
+  const sourceLabelShort = activeSourceMeta?.label || "中原领先指数（6城）";
   const compareMetaText =
     compareContext && compareSeriesRendered
       ? ` | 对比 ${compareContext.cityName}（${activeSourceLegend} vs ${compareSourceLegend}）`
       : "";
-  const chartMetaText = `${formatMonthZh(viewportStartMonth)} - ${formatMonthZh(viewportEndMonth)} | 定基 ${formatMonthZh(viewportStartMonth)} = 100 | ${sourceLabelShort}${compareMetaText}`;
-  chartMetaEl.textContent = chartMetaText;
-  chartMetaEl.title = chartMetaText;
+  chartMetaEl.textContent = `${formatMonthZh(viewportStartMonth)} - ${formatMonthZh(viewportEndMonth)} | 定基 ${formatMonthZh(viewportStartMonth)} = 100 | ${sourceLabelShort}${compareMetaText}`;
 
   renderSummaryTable(visibleSummaryRows);
   renderChartStatsOverlay(visibleSummaryRows, viewportStartMonth, viewportEndMonth);
@@ -3525,6 +3400,12 @@ function render() {
 }
 
 function bindEvents() {
+  if (themeModeEl) {
+    themeModeEl.addEventListener("change", () => {
+      applyThemeMode(themeModeEl.value, { persist: true, rerender: true });
+    });
+  }
+
   if (dataSourceEl) {
     dataSourceEl.addEventListener("change", () => {
       const applied = applyDataSource(dataSourceEl.value);
@@ -3533,21 +3414,6 @@ function bindEvents() {
         return;
       }
       render();
-    });
-  }
-
-  if (themeModeEl) {
-    themeModeEl.addEventListener("change", () => {
-      const changed = applyThemeMode(themeModeEl.value);
-      if (changed) {
-        render();
-        setStatus(
-          uiState.themeMode === THEME_MODE_DARK
-            ? "已切换为深色 Bloomberg 风格。"
-            : "已切换为浅色 Stripe 风格。",
-          false,
-        );
-      }
     });
   }
 
@@ -3716,9 +3582,9 @@ function init() {
     return;
   }
 
+  applyThemeMode(readStoredThemeMode(), { persist: false, rerender: false });
+
   populateSourceSelector(availableSources);
-  const persistedThemeMode = getPersistedThemeMode();
-  applyThemeMode(persistedThemeMode, { persist: false });
   const defaultSource =
     availableSources.find((source) => source.key === "centaline6") || availableSources[0];
   const applied = applyDataSource(defaultSource.key);

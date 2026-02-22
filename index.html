@@ -7,15 +7,15 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Marcellus&family=Noto+Sans+SC:wght@400;500;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="style.css?v=20260222-theme-split8" />
+    <link rel="stylesheet" href="style.css?v=20260222-dark-header-transparent" />
     <script defer src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
     <script defer src="house-price-data.js"></script>
     <script defer src="house-price-data-nbs-70.js"></script>
-    <script defer src="app.js?v=20260222-theme-split21"></script>
+    <script defer src="app.js?v=20260222-dark-tooltip"></script>
   </head>
   <body>
     <main class="page">
@@ -30,19 +30,17 @@
         <aside class="controls">
           <h2>设置</h2>
 
-          <div class="control-block">
+          <div class="control-block control-block--loose-select">
             <h3>数据源</h3>
             <label>
-              选择数据源
               <select id="dataSource" aria-label="数据源选择"></select>
             </label>
           </div>
 
-          <div class="control-block">
-            <h3>页面主题</h3>
+          <div class="control-block control-block--loose-select">
+            <h3>页面风格</h3>
             <label>
-              显示风格
-              <select id="themeMode" aria-label="页面主题">
+              <select id="themeMode" aria-label="页面风格选择">
                 <option value="light">浅色</option>
                 <option value="dark">深色</option>
               </select>
