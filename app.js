@@ -1557,13 +1557,13 @@ async function captureChartStageSnapshot(pixelRatio = 2) {
   const gridBottom = Number.isFinite(Number(gridBottomRaw))
     ? Number(gridBottomRaw)
     : CHART_GRID_LAYOUT.bottom;
-  const exportGridBottom = Math.max(60, gridBottom - 46);
+  const exportGridBottom = Math.max(56, gridBottom - 56);
   const legendBottomRaw = option.legend?.[0]?.bottom;
   const legendBottom = Number.isFinite(Number(legendBottomRaw))
     ? Number(legendBottomRaw)
     : 10;
-  const exportLegendBottom = clampNumber(legendBottom + 8, legendBottom, 24);
-  const exportTrimBottomPx = Math.max(8, Math.round(10 * pixelRatio));
+  const exportLegendBottom = clampNumber(legendBottom + 12, legendBottom, 30);
+  const exportTrimBottomPx = Math.max(10, Math.round(14 * pixelRatio));
 
   const hideOption = {
     toolbox: {
@@ -1857,9 +1857,32 @@ async function exportCurrentChartImage(pixelRatio = 2, label = "标准清晰") {
   ctx.drawImage(chartImage, 0, 0);
   drawOverlaySummaryOnCanvas(ctx, canvas.width, canvas.height, latestRenderContext);
 
+  let outputCanvas = canvas;
+  const fallbackTrimBottomPx = Math.max(10, Math.round(14 * pixelRatio));
+  if (canvas.height > fallbackTrimBottomPx + 1) {
+    const trimmedCanvas = document.createElement("canvas");
+    trimmedCanvas.width = canvas.width;
+    trimmedCanvas.height = canvas.height - fallbackTrimBottomPx;
+    const trimmedCtx = trimmedCanvas.getContext("2d");
+    if (trimmedCtx) {
+      trimmedCtx.drawImage(
+        canvas,
+        0,
+        0,
+        canvas.width,
+        trimmedCanvas.height,
+        0,
+        0,
+        trimmedCanvas.width,
+        trimmedCanvas.height,
+      );
+      outputCanvas = trimmedCanvas;
+    }
+  }
+
   const suffix = pixelRatio >= 4 ? "-ultra-hd" : "";
   const filename = `house-price-base100-${latestRenderContext.startMonth}-to-${latestRenderContext.endMonth}${suffix}.png`;
-  downloadByDataURL(canvas.toDataURL("image/png"), filename);
+  downloadByDataURL(outputCanvas.toDataURL("image/png"), filename);
   setStatus(`图片已导出（${label}，含当前分析与表格设置）。`, false);
 }
 
