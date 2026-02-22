@@ -193,3 +193,29 @@ node scripts/fetch-nbs-70city-secondhand.mjs
 
 - 中原相关原始数据可能涉及付费授权，请确保合法获取与使用。
 - 项目和图表默认用于研究与交流，请按实际授权范围使用与传播。
+
+---
+
+## 12. 微信小程序版本（SwiftUI Charts 风格）
+
+项目已新增小程序目录：`wechat-miniapp/`，复用现有房价数据并提供移动端可视化体验。
+
+主要能力：
+- 双数据源（中原 6 城 / 统计局 70 城）；
+- 城市多选（最多 6 个）与搜索；
+- 指数走势 / 累计回撤切换；
+- 月度起止自定义区间（自动重定基）；
+- 原生 Canvas 绘制的平滑曲线、渐变面积、触摸浮窗；
+- 卡片指标 + 对比表，适配手机竖屏查看；
+- 小程序内海报导出（预览 + 保存到相册）。
+
+数据同步命令：
+
+```bash
+cd "<项目根目录>/house-price-dashboard"
+node wechat-miniapp/scripts/sync-data.mjs
+```
+
+微信开发者工具导入目录：
+
+`<项目根目录>/house-price-dashboard/wechat-miniapp`
