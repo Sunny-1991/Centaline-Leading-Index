@@ -120,7 +120,7 @@ const CHART_THEME_TOKENS = Object.freeze({
     zoomMoveHandleHover: "rgba(79, 111, 255, 0.42)",
     zoomHandleHover: "rgba(241, 248, 255, 0.99)",
     zoomHandleHoverBorder: "rgba(79, 111, 255, 0.94)",
-    textMaskColor: "rgba(225, 238, 255, 0.64)",
+    textMaskColor: "rgba(255, 255, 255, 0.64)",
     toolboxIcon: "#4c6685",
     toolboxIconHover: "#4f6fff",
     exportBackground: "#ffffff",
