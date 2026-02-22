@@ -181,6 +181,8 @@ const OVERLAY_TOP_RATIO = 0.05;
 const OVERLAY_SCALE_MIN = 0.72;
 const OVERLAY_SCALE_MAX = 1.3;
 const OVERLAY_TABLE_SCALE = 1.05;
+const LEGEND_FONT_SCALE = 1.05;
+const X_AXIS_LABEL_FONT_SCALE = 1.1;
 const CHART_GRID_LAYOUT = Object.freeze({
   left: 70,
   right: 90,
@@ -667,7 +669,7 @@ function resolveXAxisLabelLayout(months, chartWidth, visibleStartIndex, visibleE
   return {
     margin,
     rotate: 0,
-    fontSize,
+    fontSize: Math.round(fontSize * X_AXIS_LABEL_FONT_SCALE * 10) / 10,
     formatLabel(value) {
       const text = normalizeMonthToken(value);
       if (!text) return "";
@@ -1540,6 +1542,24 @@ function loadImageByURL(url) {
   });
 }
 
+function resolveExportRenderLayout(option = {}, pixelRatio = 2) {
+  const gridBottomRaw = option.grid?.[0]?.bottom;
+  const gridBottom = Number.isFinite(Number(gridBottomRaw))
+    ? Number(gridBottomRaw)
+    : CHART_GRID_LAYOUT.bottom;
+  const legendBottomRaw = option.legend?.[0]?.bottom;
+  const legendBottom = Number.isFinite(Number(legendBottomRaw))
+    ? Number(legendBottomRaw)
+    : 10;
+  return {
+    gridBottom,
+    legendBottom,
+    exportGridBottom: Math.max(38, gridBottom - 74),
+    exportLegendBottom: clampNumber(legendBottom + 24, legendBottom, 44),
+    exportTrimBottomPx: Math.max(10, Math.round(14 * pixelRatio)),
+  };
+}
+
 async function captureChartStageSnapshot(pixelRatio = 2) {
   if (!chartStageEl) return null;
   if (typeof window.html2canvas !== "function") return null;
@@ -1553,27 +1573,17 @@ async function captureChartStageSnapshot(pixelRatio = 2) {
     ? option.dataZoom.find((item) => item?.type === "slider")
     : null;
   const sliderShow = sliderDataZoom ? sliderDataZoom.show !== false : true;
-  const gridBottomRaw = option.grid?.[0]?.bottom;
-  const gridBottom = Number.isFinite(Number(gridBottomRaw))
-    ? Number(gridBottomRaw)
-    : CHART_GRID_LAYOUT.bottom;
-  const exportGridBottom = Math.max(56, gridBottom - 56);
-  const legendBottomRaw = option.legend?.[0]?.bottom;
-  const legendBottom = Number.isFinite(Number(legendBottomRaw))
-    ? Number(legendBottomRaw)
-    : 10;
-  const exportLegendBottom = clampNumber(legendBottom + 12, legendBottom, 30);
-  const exportTrimBottomPx = Math.max(10, Math.round(14 * pixelRatio));
+  const exportLayout = resolveExportRenderLayout(option, pixelRatio);
 
   const hideOption = {
     toolbox: {
       show: false,
     },
     legend: {
-      bottom: exportLegendBottom,
+      bottom: exportLayout.exportLegendBottom,
     },
     grid: {
-      bottom: exportGridBottom,
+      bottom: exportLayout.exportGridBottom,
     },
   };
   if (sliderDataZoom) {
@@ -1601,10 +1611,10 @@ async function captureChartStageSnapshot(pixelRatio = 2) {
         show: toolboxShow,
       },
       legend: {
-        bottom: legendBottom,
+        bottom: exportLayout.legendBottom,
       },
       grid: {
-        bottom: gridBottom,
+        bottom: exportLayout.gridBottom,
       },
     };
     if (sliderDataZoom) {
@@ -1621,10 +1631,10 @@ async function captureChartStageSnapshot(pixelRatio = 2) {
   if (!stageCanvas) return null;
 
   let outputCanvas = stageCanvas;
-  if (stageCanvas.height > exportTrimBottomPx + 1) {
+  if (stageCanvas.height > exportLayout.exportTrimBottomPx + 1) {
     const trimmedCanvas = document.createElement("canvas");
     trimmedCanvas.width = stageCanvas.width;
-    trimmedCanvas.height = stageCanvas.height - exportTrimBottomPx;
+    trimmedCanvas.height = stageCanvas.height - exportLayout.exportTrimBottomPx;
     const trimmedCtx = trimmedCanvas.getContext("2d");
     if (trimmedCtx) {
       trimmedCtx.drawImage(
@@ -1830,12 +1840,66 @@ async function exportCurrentChartImage(pixelRatio = 2, label = "标准清晰") {
     return;
   }
 
-  const chartDataUrl = chart.getDataURL({
-    type: "png",
-    pixelRatio,
-    backgroundColor: getChartThemeTokens().exportBackground,
-    excludeComponents: ["toolbox", "dataZoom"],
-  });
+  const option = chart.getOption?.() || {};
+  const sliderDataZoom = Array.isArray(option.dataZoom)
+    ? option.dataZoom.find((item) => item?.type === "slider")
+    : null;
+  const sliderShow = sliderDataZoom ? sliderDataZoom.show !== false : true;
+  const toolboxShow = option.toolbox?.[0]?.show !== false;
+  const exportLayout = resolveExportRenderLayout(option, pixelRatio);
+
+  const exportOnlyOption = {
+    toolbox: {
+      show: false,
+    },
+    legend: {
+      bottom: exportLayout.exportLegendBottom,
+    },
+    grid: {
+      bottom: exportLayout.exportGridBottom,
+    },
+  };
+  if (sliderDataZoom) {
+    exportOnlyOption.dataZoom = [
+      {
+        type: "slider",
+        show: false,
+      },
+    ];
+  }
+
+  chart.setOption(exportOnlyOption, { lazyUpdate: false });
+  let chartDataUrl = "";
+  try {
+    chartDataUrl = chart.getDataURL({
+      type: "png",
+      pixelRatio,
+      backgroundColor: getChartThemeTokens().exportBackground,
+      excludeComponents: ["toolbox", "dataZoom"],
+    });
+  } finally {
+    const restoreOption = {
+      toolbox: {
+        show: toolboxShow,
+      },
+      legend: {
+        bottom: exportLayout.legendBottom,
+      },
+      grid: {
+        bottom: exportLayout.gridBottom,
+      },
+    };
+    if (sliderDataZoom) {
+      restoreOption.dataZoom = [
+        {
+          type: "slider",
+          show: sliderShow,
+        },
+      ];
+    }
+    chart.setOption(restoreOption, { lazyUpdate: false });
+  }
+
   let chartImage;
   try {
     chartImage = await loadImageByURL(chartDataUrl);
@@ -1858,7 +1922,7 @@ async function exportCurrentChartImage(pixelRatio = 2, label = "标准清晰") {
   drawOverlaySummaryOnCanvas(ctx, canvas.width, canvas.height, latestRenderContext);
 
   let outputCanvas = canvas;
-  const fallbackTrimBottomPx = Math.max(10, Math.round(14 * pixelRatio));
+  const fallbackTrimBottomPx = exportLayout.exportTrimBottomPx;
   if (canvas.height > fallbackTrimBottomPx + 1) {
     const trimmedCanvas = document.createElement("canvas");
     trimmedCanvas.width = canvas.width;
@@ -2313,6 +2377,7 @@ function makeOption(
   );
   const endLabelFontSize = chartWidth <= 520 ? 14 : chartWidth <= 760 ? 16 : 18;
   const legendFontSize = chartWidth <= 520 ? 12.5 : chartWidth <= 760 ? 13.5 : 15;
+  const legendFontSizeScaled = Math.round(legendFontSize * LEGEND_FONT_SCALE * 10) / 10;
   const yAxisLabelFontSize = chartWidth <= 520 ? 12 : chartWidth <= 760 ? 13 : 14;
   const seriesLineWidth = chartWidth <= 520 ? 1.88 : chartWidth <= 760 ? 2.1 : 3.02;
   const markLineWidth = chartWidth <= 520 ? 1.15 : chartWidth <= 760 ? 1.32 : 2;
@@ -2406,7 +2471,7 @@ function makeOption(
       bottom: 10,
       textStyle: {
         color: chartTheme.legendText,
-        fontSize: legendFontSize,
+        fontSize: legendFontSizeScaled,
         fontWeight: 700,
         fontFamily: CHART_FONT_FAMILY,
       },
